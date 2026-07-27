@@ -1,0 +1,75 @@
+<div class="users-container">
+  <div class="header-section">
+    <div>
+      <h2 class="page-title">Gestión de Usuarios y Licencias</h2>
+      <p class="page-subtitle">Administra los asesores registrados y sus días de acceso al CRM SaaS</p>
+    </div>
+  </div>
+
+  <!-- Notification Banner -->
+  <div *ngIf="message" [class]="isSuccess ? 'alert alert-success' : 'alert alert-danger'">
+    {{ message }}
+  </div>
+
+  <!-- Users Data Table -->
+  <div class="table-card">
+    <div class="table-header">
+      <h3>Lista de Usuarios y Roles</h3>
+      <span class="user-count">{{ agents.length }} Asesores Registrados</span>
+    </div>
+
+    <div class="table-responsive">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Usuario</th>
+            <th>Nombre del Agente</th>
+            <th>Correo Electrónico</th>
+            <th>Rol</th>
+            <th>Días Restantes</th>
+            <th>Vencimiento</th>
+            <th>Estado</th>
+            <th>Acciones de Licencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let agent of agents">
+            <td>#{{ agent.userId }}</td>
+            <td class="font-bold">{{ agent.username }}</td>
+            <td>{{ agent.agentName || 'N/A' }}</td>
+            <td>{{ agent.email }}</td>
+            <td>
+              <span [class]="agent.role === 'ROLE_ADMIN' ? 'badge badge-admin' : 'badge badge-agent'">
+                {{ agent.role === 'ROLE_ADMIN' ? 'Administrador' : 'Asesor de Crédito' }}
+              </span>
+            </td>
+            <td>
+              <span class="days-pill" [class.expired]="agent.daysRemaining <= 0">
+                {{ agent.daysRemaining }} Días
+              </span>
+            </td>
+            <td>{{ agent.expiresAt | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>
+              <span [class]="agent.status === 'ACTIVE' ? 'status-dot active' : 'status-dot expired'"></span>
+              {{ agent.status === 'ACTIVE' ? 'Activo' : 'Expirado' }}
+            </td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-add-days" (click)="onAddDays(agent.userId, 30)">
+                  +30 Días
+                </button>
+                <button class="btn btn-add-days-plus" (click)="onAddDays(agent.userId, 90)">
+                  +90 Días
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="agents.length === 0 && !isLoading">
+            <td colspan="9" class="empty-message">No hay usuarios o asesores registrados.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

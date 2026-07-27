@@ -56,6 +56,25 @@ export class AuthService {
     return !!(token && user && user.daysRemaining > 0 && user.status === 'ACTIVE');
   }
 
+  isAdmin(): boolean {
+    const user = this.currentUserValue;
+    return !!(user && user.role === 'ROLE_ADMIN');
+  }
+
+  getAllAgents(): Observable<AuthResponse[]> {
+    const token = localStorage.getItem('token');
+    return this.http.get<AuthResponse[]>(`${this.apiUrl}/agents`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  addDaysToAgent(userId: number, days: number): Observable<AuthResponse> {
+    const token = localStorage.getItem('token');
+    return this.http.put<AuthResponse>(`${this.apiUrl}/agents/${userId}/add-days?additionalDays=${days}`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   private getStoredUser(): AuthResponse | null {
     const userJson = localStorage.getItem('user');
     if (userJson) {

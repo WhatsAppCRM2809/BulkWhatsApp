@@ -4,13 +4,16 @@ import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { DataCleansingComponent } from './pages/data-cleansing/data-cleansing.component';
 import { LogsComponent } from './pages/logs/logs.component';
 import { SettingsComponent } from './pages/settings/settings.component';
+import { UsersComponent } from './pages/users/users.component';
 import { authGuard } from './core/guards/auth.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: '', component: DashboardComponent, canActivate: [authGuard] },
   { path: 'data-cleansing', component: DataCleansingComponent, canActivate: [authGuard] },
   { path: 'logs', component: LogsComponent, canActivate: [authGuard] },
+  { path: 'users', component: UsersComponent, canActivate: [authGuard, adminGuard] },
   { path: 'settings', component: SettingsComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '' }
 ];
