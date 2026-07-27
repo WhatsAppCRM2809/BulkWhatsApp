@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, Router } from '@angular/router';
 import { HeaderComponent } from './components/header/header.component';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { ExcelService } from './core/services/excel.service';
+import { AuthService } from './core/services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -18,9 +19,17 @@ import { ExcelService } from './core/services/excel.service';
   styleUrl: './app.css'
 })
 export class App implements OnInit {
-  constructor(private excelService: ExcelService) {}
+  constructor(
+    private excelService: ExcelService,
+    public authService: AuthService,
+    public router: Router
+  ) {}
 
   ngOnInit(): void {
     this.excelService.loadMockData();
+  }
+
+  isLoginPage(): boolean {
+    return this.router.url.includes('/login');
   }
 }
