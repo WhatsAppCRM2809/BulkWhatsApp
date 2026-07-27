@@ -47,6 +47,15 @@ import { AuthService } from '../../core/services/auth.service';
           <span class="pulse-dot"></span>
           <span>WhatsApp Conectado</span>
         </div>
+
+        <button class="logout-sidebar-btn" (click)="authService.logout()">
+          <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span>Cerrar Sesión</span>
+        </button>
       </div>
     </aside>
   `,
@@ -144,6 +153,14 @@ import { AuthService } from '../../core/services/auth.service';
       font-weight: 600;
       border-left: 3px solid var(--accent-cyan);
     }
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+    }
     .status-box {
       display: flex;
       align-items: center;
@@ -162,6 +179,31 @@ import { AuthService } from '../../core/services/auth.service';
       border-radius: 50%;
       background-color: #22c55e;
       box-shadow: 0 0 10px #22c55e;
+    }
+    .logout-sidebar-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.75rem;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .logout-sidebar-btn:hover {
+      background: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+    .logout-icon {
+      width: 16px;
+      height: 16px;
     }
   `]
 })
