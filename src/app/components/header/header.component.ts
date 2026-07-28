@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ThemeService } from '../../core/services/theme.service';
 import { ExcelService } from '../../core/services/excel.service';
 import { WhatsAppService } from '../../core/services/whatsapp.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-header',
@@ -47,11 +48,22 @@ import { WhatsAppService } from '../../core/services/whatsapp.service';
           <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
         </button>
 
+        <!-- User Profile Pill -->
+        <div class="user-pill" *ngIf="authService.currentUserValue">
+          <svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span class="user-name">{{ authService.currentUserValue.agentName || authService.currentUserValue.username }}</span>
+        </div>
+
         <!-- Light / Dark Theme Toggle Button -->
         <button class="btn btn-secondary theme-toggle-btn" (click)="themeService.toggleTheme()">
           <svg class="btn-svg" *ngIf="themeService.currentTheme() === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
           <svg class="btn-svg" *ngIf="themeService.currentTheme() === 'light'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-          <span>{{ themeService.currentTheme() === 'dark' ? 'Modo Claro' : 'Modo Oscuro' }}</span>
+        </button>
+
+        <!-- Logout Button -->
+        <button class="btn btn-logout" (click)="authService.logout()" title="Cerrar Sesión de Agente">
+          <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Salir</span>
         </button>
       </div>
     </header>
@@ -148,6 +160,41 @@ import { WhatsAppService } from '../../core/services/whatsapp.service';
       color: var(--accent-cyan);
       border: 1px solid var(--accent-cyan-glow);
     }
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.75rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .user-icon {
+      width: 14px;
+      height: 14px;
+      color: var(--accent-cyan);
+    }
+    .btn-logout {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+      padding: 0.45rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+    .btn-logout:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
     .file-label {
       cursor: pointer;
     }
@@ -240,7 +287,8 @@ export class HeaderComponent {
   constructor(
     public themeService: ThemeService,
     public excelService: ExcelService,
-    public waService: WhatsAppService
+    public waService: WhatsAppService,
+    public authService: AuthService
   ) {}
 
   public onFileSelected(event: Event): void {

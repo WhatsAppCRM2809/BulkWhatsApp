@@ -1,4 +1,10 @@
-<div class="app-container">
+<!-- Fullscreen Login View without Sidebar & Header -->
+<ng-container *ngIf="isLoginPage()">
+  <router-outlet></router-outlet>
+</ng-container>
+
+<!-- Dashboard Main Layout with Sidebar & Header -->
+<div class="app-container" *ngIf="!isLoginPage()">
   <!-- Sidebar Navigation -->
   <app-sidebar></app-sidebar>
 
