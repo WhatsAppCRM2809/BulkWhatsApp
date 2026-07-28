@@ -33,6 +33,11 @@ import { ModalService } from '../../core/services/modal.service';
               <span>Agregar Cliente</span>
             </button>
 
+            <button class="btn btn-outline export-btn" (click)="onExportContacts()" title="Exportar esta lista a Excel (.xlsx)">
+              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Exportar Excel</span>
+            </button>
+
             <button class="btn btn-danger-outline" (click)="confirmClearTable()">
               <svg class="trash-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -56,9 +61,11 @@ import { ModalService } from '../../core/services/modal.service';
         <table class="data-table">
           <thead>
             <tr>
+              <th>DOC / DNI</th>
               <th>CTA BT</th>
               <th>Nombre Completo (Limpio)</th>
               <th>Teléfono Envío</th>
+              <th>Propensión</th>
               <th>Producto</th>
               <th>Oferta (S/)</th>
               <th>Tasa (%)</th>
@@ -70,8 +77,9 @@ import { ModalService } from '../../core/services/modal.service';
           <tbody>
             <tr *ngFor="let contact of filteredContacts()" 
                 [class.selected-row]="excelService.selectedContact()?.id === contact.id"
-                (click)="excelService.selectContact(contact)"
+                (click)="excelService.selectedContact.set(contact)"
                 class="clickable-row">
+              <td><span class="doc-code">{{ contact.doc || '-' }}</span></td>
               <td><code class="cta-code">{{ contact.ctaBt }}</code></td>
               <td>
                 <div class="name-cell">
@@ -87,29 +95,36 @@ import { ModalService } from '../../core/services/modal.service';
                   Sin Celular
                 </span>
               </td>
+              <td>
+                <span class="badge badge-propension" *ngIf="contact.propension !== undefined && contact.propension !== ''">
+                  🔥 {{ contact.propension }}
+                </span>
+                <span class="text-muted" *ngIf="contact.propension === undefined || contact.propension === ''">-</span>
+              </td>
               <td><span class="badge badge-warning">{{ contact.producto }}</span></td>
-              <td class="amount-cell"><strong>S/ {{ contact.oferta | number:'1.2-2' }}</strong></td>
-              <td>{{ contact.tasa }}%</td>
+              <td class="amount-cell">S/ {{ contact.oferta | number:'1.2-2' }}</td>
+              <td class="rate-cell">{{ contact.tasa }}%</td>
               <td>{{ contact.plazo }}m</td>
               <td>{{ contact.agencia }}</td>
               <td>
-                <span class="badge" [ngClass]="{
-                  'badge-success': contact.estado === 'Enviado' || contact.estado === 'Interesado',
-                  'badge-warning': contact.estado === 'Pendiente',
-                  'badge-error': contact.estado === 'Fallido' || contact.estado === 'Sin Telefono'
-                }">
+                <span class="badge" 
+                      [class.badge-secondary]="contact.estado === 'Pendiente'"
+                      [class.badge-success]="contact.estado === 'Enviado' || contact.estado === 'Interesado'"
+                      [class.badge-danger]="contact.estado === 'Fallido' || contact.estado === 'Sin Telefono'">
                   {{ contact.estado }}
                 </span>
               </td>
             </tr>
+
+            <!-- Empty State -->
             <tr *ngIf="filteredContacts().length === 0">
-              <td colspan="9" class="empty-cell">
-                <span>No se encontraron registros. ¡Agrega un cliente manual o presiona "Cargar Datos de Prueba"!</span>
-                <br />
-                <button class="btn btn-outline btn-sm mt-2" (click)="excelService.loadMockData()">
-                  <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                  <span>Cargar Datos de Prueba Bancarios</span>
-                </button>
+              <td colspan="11" class="empty-state-cell">
+                <div class="empty-state">
+                  <svg class="empty-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <p class="empty-title" *ngIf="searchQuery.trim().length > 0">No se encontraron clientes para "{{ searchQuery }}"</p>
+                  <p class="empty-title" *ngIf="searchQuery.trim().length === 0">No hay contactos cargados en la base de datos</p>
+                  <p class="empty-sub">Importa una base de datos Excel (.xlsx, .csv) o haz clic en "Agregar Cliente".</p>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -117,184 +132,172 @@ import { ModalService } from '../../core/services/modal.service';
       </div>
     </div>
 
-    <!-- Modal Form: Agregar Cliente Manual -->
-    <div class="modal-overlay" *ngIf="showAddModal" (click)="closeAddModal()">
-      <div class="modal-content-glass" (click)="$event.stopPropagation()">
+    <!-- Modal para Agregar Cliente Manualmente -->
+    <div class="modal-backdrop" *ngIf="showAddModal">
+      <div class="modal-card">
         <div class="modal-header">
-          <div class="header-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <line x1="19" y1="8" x2="19" y2="14"></line>
-              <line x1="16" y1="11" x2="22" y2="11"></line>
-            </svg>
-          </div>
-          <h3>Agregar Cliente Manual</h3>
-          <button class="close-btn" (click)="closeAddModal()">✕</button>
+          <h3>➕ Agregar Nuevo Cliente al CRM</h3>
+          <button class="close-btn" (click)="closeAddModal()">&times;</button>
         </div>
 
-        <form (ngSubmit)="saveManualContact()" class="modal-form">
-          <div class="form-group highlight-field">
-            <label>Número de WhatsApp / Teléfono <span class="required-star">* (Obligatorio)</span></label>
-            <input type="text" class="form-control" [(ngModel)]="newContactForm.telefono" name="telefono" placeholder="Ej. 961061471 o 51961061471" required autofocus />
-            <small class="help-text">Ingrese 9 dígitos o con código de país. Es el único campo obligatorio.</small>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Nombre Completo <small class="optional-tag">(Opcional)</small></label>
-              <input type="text" class="form-control" [(ngModel)]="newContactForm.nombre" name="nombre" placeholder="Ej. Julio Cesar Torres" />
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Nombre Completo (Cliente)*</label>
+              <input type="text" class="form-control" [(ngModel)]="newContactForm.nombre" placeholder="Ej: CARLOS EDUARDO SILVA DIAZ" required />
             </div>
-
-            <div class="form-group">
-              <label>N° Cuenta / CTA BT <small class="optional-tag">(Opcional)</small></label>
-              <input type="text" class="form-control" [(ngModel)]="newContactForm.ctaBt" name="ctaBt" placeholder="Ej. 45812999" />
-            </div>
-
-            <div class="form-group">
-              <label>Producto <small class="optional-tag">(Opcional)</small></label>
-              <input type="text" class="form-control" [(ngModel)]="newContactForm.producto" name="producto" placeholder="Préstamo Personal" />
-            </div>
-
-            <div class="form-group">
-              <label>Monto Oferta (S/) <small class="optional-tag">(Opcional)</small></label>
-              <input type="number" class="form-control" [(ngModel)]="newContactForm.oferta" name="oferta" placeholder="15000" />
-            </div>
-
-            <div class="form-group">
-              <label>Tasa (%) <small class="optional-tag">(Opcional)</small></label>
-              <input type="number" step="0.1" class="form-control" [(ngModel)]="newContactForm.tasa" name="tasa" placeholder="35.0" />
-            </div>
-
-            <div class="form-group">
-              <label>Plazo (Meses) <small class="optional-tag">(Opcional)</small></label>
-              <input type="number" class="form-control" [(ngModel)]="newContactForm.plazo" name="plazo" placeholder="12" />
-            </div>
-
-            <div class="form-group full-width">
-              <label>Agencia / Sede <small class="optional-tag">(Opcional)</small></label>
-              <input type="text" class="form-control" [(ngModel)]="newContactForm.agencia" name="agencia" placeholder="Ej. LA ALAMEDA" />
+            <div class="form-group col">
+              <label>Teléfono / Celular WhatsApp*</label>
+              <input type="text" class="form-control" [(ngModel)]="newContactForm.telefono" placeholder="Ej: 987654321" required />
             </div>
           </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" (click)="closeAddModal()">Cancelar</button>
-            <button type="submit" class="btn btn-save">💾 Guardar Cliente</button>
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Cuenta / Código CTA BT</label>
+              <input type="text" class="form-control" [(ngModel)]="newContactForm.ctaBt" placeholder="Ej: 88492019" />
+            </div>
+            <div class="form-group col">
+              <label>Producto Financiero</label>
+              <input type="text" class="form-control" [(ngModel)]="newContactForm.producto" placeholder="Ej: Préstamo Personal" />
+            </div>
           </div>
-        </form>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Monto Oferta (S/)</label>
+              <input type="number" class="form-control" [(ngModel)]="newContactForm.oferta" placeholder="Ej: 15000" />
+            </div>
+            <div class="form-group col">
+              <label>Tasa Preferencial (%)</label>
+              <input type="number" class="form-control" [(ngModel)]="newContactForm.tasa" placeholder="Ej: 35.0" />
+            </div>
+            <div class="form-group col">
+              <label>Plazo (Meses)</label>
+              <input type="number" class="form-control" [(ngModel)]="newContactForm.plazo" placeholder="Ej: 12" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Agencia Asignada</label>
+            <input type="text" class="form-control" [(ngModel)]="newContactForm.agencia" placeholder="Ej: Agencia San Isidro" />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="closeAddModal()">Cancelar</button>
+          <button class="btn btn-primary" (click)="saveManualContact()">💾 Guardar y Registrar</button>
+        </div>
       </div>
     </div>
   `,
   styles: [`
     .table-card {
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
+      padding: 0;
+      overflow: hidden;
     }
     .table-header {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
     }
     .header-left {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 1.5rem;
       flex-wrap: wrap;
     }
     .tab-buttons {
       display: flex;
-      gap: 0.5rem;
-      background-color: var(--bg-input);
-      padding: 0.35rem;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      flex-wrap: wrap;
+      background-color: var(--bg-tertiary);
+      padding: 0.25rem;
+      border-radius: var(--radius-md);
+      gap: 0.25rem;
     }
     .tab-btn {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.55rem 1.1rem;
+      padding: 0.5rem 0.85rem;
       border: none;
       background: none;
-      color: var(--text-secondary);
-      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
       font-weight: 600;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: var(--transition);
     }
     .tab-btn.active {
-      background-color: var(--bg-card);
+      background-color: var(--bg-secondary);
       color: var(--text-primary);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--shadow-sm);
     }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-valid { background-color: var(--accent-cyan); }
+    .dot-invalid { background-color: #f59e0b; }
+    
     .action-buttons {
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
     .btn-add-manual {
+      background-color: #0284c7;
+      color: #ffffff;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.8rem;
+      border: none;
+      border-radius: var(--radius-md);
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: #ffffff;
-      border: none;
-      padding: 0.55rem 1.1rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
+      gap: 0.35rem;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-      transition: all 0.2s ease;
+      transition: var(--transition);
     }
     .btn-add-manual:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+      background-color: #0369a1;
     }
     .btn-danger-outline {
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.8rem;
+      border-radius: var(--radius-md);
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      background: rgba(239, 68, 68, 0.1);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      padding: 0.55rem 1.1rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
+      gap: 0.35rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: var(--transition);
     }
     .btn-danger-outline:hover {
-      background: rgba(239, 68, 68, 0.25);
-      color: #ffffff;
-      transform: translateY(-2px);
+      background-color: rgba(239, 68, 68, 0.1);
     }
-    .add-icon, .trash-icon {
-      width: 15px;
-      height: 15px;
+    .export-btn {
+      padding: 0.45rem 0.85rem;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
+    .add-icon, .trash-icon, .btn-svg {
+      width: 14px;
+      height: 14px;
     }
-    .dot-valid { background-color: #22c55e; box-shadow: 0 0 6px #22c55e; }
-    .dot-invalid { background-color: #f43f5e; box-shadow: 0 0 6px #f43f5e; }
     .search-box {
-      width: 300px;
-    }
-    @media (max-width: 640px) {
-      .search-box {
-        width: 100%;
-      }
+      flex: 1;
+      max-width: 320px;
     }
     .search-input-wrapper {
       position: relative;
@@ -303,56 +306,63 @@ import { ModalService } from '../../core/services/modal.service';
     }
     .search-svg {
       position: absolute;
-      left: 0.85rem;
+      left: 0.75rem;
       width: 16px;
       height: 16px;
       color: var(--text-muted);
     }
     .search-input {
-      padding-left: 2.35rem;
-    }
-    .table-responsive {
-      width: 100%;
-      overflow-x: auto;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
+      padding-left: 2.25rem;
+      font-size: 0.85rem;
     }
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.85rem;
-      min-width: 850px;
-    }
-    .data-table th, .data-table td {
-      padding: 0.85rem 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border-color);
+      font-size: 0.825rem;
     }
     .data-table th {
-      background-color: var(--bg-card-hover);
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 0.725rem;
-      letter-spacing: 0.05em;
+      background-color: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-weight: 700;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+    .data-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      white-space: nowrap;
     }
     .clickable-row {
       cursor: pointer;
-      transition: background-color 0.15s ease;
+      transition: var(--transition);
     }
     .clickable-row:hover {
-      background-color: var(--bg-card-hover);
+      background-color: var(--bg-hover);
     }
     .selected-row {
       background-color: var(--accent-cyan-light) !important;
-      border-left: 3px solid var(--accent-cyan);
     }
     .cta-code {
       font-family: monospace;
-      background-color: var(--bg-input);
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
       color: var(--accent-cyan);
+      background-color: var(--bg-tertiary);
+      padding: 0.2rem 0.4rem;
+      border-radius: var(--radius-sm);
+    }
+    .doc-code {
+      font-family: monospace;
+      color: var(--text-secondary);
+      background-color: var(--bg-tertiary);
+      padding: 0.2rem 0.4rem;
+      border-radius: var(--radius-sm);
+    }
+    .badge-propension {
+      background-color: rgba(236, 72, 153, 0.15);
+      color: #ec4899;
+      font-weight: 700;
     }
     .name-cell {
       display: flex;
@@ -368,196 +378,127 @@ import { ModalService } from '../../core/services/modal.service';
     }
     .phone-tag {
       font-family: monospace;
-      font-size: 0.8rem;
-      color: var(--status-success-text);
       font-weight: 600;
-    }
-    .phone-invalid {
-      color: var(--status-error-text);
-    }
-    .amount-cell {
       color: var(--accent-cyan);
     }
-    .empty-cell {
-      text-align: center;
-      padding: 3rem;
+    .phone-invalid {
+      color: #f59e0b;
+    }
+    .amount-cell {
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .rate-cell {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    .badge {
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-full);
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .badge-warning {
+      background-color: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+    .badge-secondary {
+      background-color: var(--bg-tertiary);
       color: var(--text-muted);
     }
-    .btn-svg {
-      width: 14px;
-      height: 14px;
+    .badge-success {
+      background-color: var(--status-success-bg);
+      color: var(--status-success-text);
     }
-    .mt-2 {
-      margin-top: 0.75rem;
+    .badge-danger {
+      background-color: var(--status-error-bg);
+      color: var(--status-error-text);
     }
-
+    .empty-state-cell {
+      padding: 3rem 1rem !important;
+      text-align: center;
+    }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .empty-svg {
+      width: 48px;
+      height: 48px;
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+    .empty-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    .empty-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.4;
+    }
+    
     /* Modal Styles */
-    .modal-overlay {
+    .modal-backdrop {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
-      z-index: 99999;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0,0,0,0.6);
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 1rem;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
     }
-
-    .modal-content-glass {
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
+    .modal-card {
+      background-color: var(--bg-secondary);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
       width: 100%;
-      max-width: 600px;
-      padding: 2rem;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-      animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      max-width: 580px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
     }
-
     .modal-header {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      position: relative;
     }
-
-    .header-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: rgba(16, 185, 129, 0.15);
-      color: #10b981;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-
-    .header-icon svg {
-      width: 22px;
-      height: 22px;
-    }
-
-    .modal-header h3 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: #f8fafc;
-      flex: 1;
-    }
-
     .close-btn {
       background: none;
       border: none;
-      color: #94a3b8;
-      font-size: 1.4rem;
+      color: var(--text-muted);
+      font-size: 1.5rem;
       cursor: pointer;
-      padding: 0.2rem 0.5rem;
-      border-radius: 8px;
     }
-
-    .close-btn:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .highlight-field {
-      background: rgba(16, 185, 129, 0.08);
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      padding: 1rem;
-      border-radius: 12px;
-      margin-bottom: 1.25rem;
-    }
-
-    .required-star {
-      color: #f43f5e;
-      font-weight: 600;
-      font-size: 0.85rem;
-    }
-
-    .optional-tag {
-      color: #64748b;
-      font-weight: 400;
-      font-size: 0.75rem;
-    }
-
-    .help-text {
-      color: #94a3b8;
-      font-size: 0.78rem;
-      margin-top: 0.35rem;
-      display: block;
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .modal-body {
+      display: flex;
+      flex-direction: column;
       gap: 1rem;
     }
-
-    @media (max-width: 580px) {
-      .form-grid {
-        grid-template-columns: 1fr;
-      }
+    .form-row {
+      display: flex;
+      gap: 1rem;
     }
-
-    .full-width {
-      grid-column: 1 / -1;
+    .col {
+      flex: 1;
     }
-
-    .form-group label {
-      display: block;
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #cbd5e1;
-      margin-bottom: 0.4rem;
-    }
-
     .modal-footer {
       display: flex;
       justify-content: flex-end;
       gap: 0.75rem;
-      margin-top: 1.75rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.08);
-      color: #cbd5e1;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 0.65rem 1.4rem;
-      border-radius: 10px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
-      color: #ffffff;
-    }
-
-    .btn-save {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      border: none;
-      padding: 0.65rem 1.6rem;
-      border-radius: 10px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-    }
-
-    .btn-save:hover {
-      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
     }
   `]
 })
@@ -567,8 +508,8 @@ export class ContactsTableComponent {
 
   public showAddModal = false;
   public newContactForm = {
-    telefono: '',
     nombre: '',
+    telefono: '',
     ctaBt: '',
     producto: 'Préstamo Personal',
     oferta: 15000,
@@ -583,22 +524,41 @@ export class ContactsTableComponent {
   ) {}
 
   public filteredContacts = computed(() => {
-    const list = this.activeTab() === 'valid' ? this.excelService.validContacts() : this.excelService.invalidContacts();
-    const query = this.searchQuery.toLowerCase().trim();
-    if (!query) return list;
+    const list = this.activeTab() === 'valid' 
+      ? this.excelService.validContacts() 
+      : this.excelService.invalidContacts();
 
+    if (!this.searchQuery.trim()) return list;
+
+    const q = this.searchQuery.toLowerCase().trim();
     return list.filter(c => 
-      c.nombreCompleto.toLowerCase().includes(query) ||
-      c.ctaBt.toLowerCase().includes(query) ||
-      c.agencia.toLowerCase().includes(query) ||
-      c.telefonoValido.includes(query)
+      c.nombreCompleto.toLowerCase().includes(q) ||
+      c.ctaBt.toLowerCase().includes(q) ||
+      c.telefonoT1.includes(q) ||
+      c.telefonoValido.includes(q) ||
+      c.agencia.toLowerCase().includes(q)
     );
   });
 
+  public onExportContacts(): void {
+    const list = this.filteredContacts();
+    if (list.length === 0) {
+      this.modalService.show({
+        title: 'ℹ️ Nada que exportar',
+        message: 'No hay contactos en la lista actual para exportar.',
+        type: 'info',
+        confirmText: 'Entendido'
+      });
+      return;
+    }
+    const tabName = this.activeTab() === 'valid' ? 'WhatsApp' : 'CallCenter';
+    this.excelService.exportContactsToExcel(list, `Reporte_Clientes_${tabName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
   public openAddModal(): void {
     this.newContactForm = {
-      telefono: '',
       nombre: '',
+      telefono: '',
       ctaBt: '',
       producto: 'Préstamo Personal',
       oferta: 15000,

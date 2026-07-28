@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThemeService } from '../../core/services/theme.service';
 import { ExcelService } from '../../core/services/excel.service';
@@ -41,12 +41,26 @@ import { AuthService } from '../../core/services/auth.service';
           <input type="file" (change)="onFileSelected($event)" accept=".xlsx, .xls, .csv" hidden />
         </label>
 
-        <!-- WhatsApp QR Status Button -->
-        <button class="btn btn-outline status-badge-btn" (click)="showQrModal = true">
-          <span class="dot" [class.dot-online]="waService.isConnected()"></span>
-          <span class="btn-text">{{ waService.isConnected() ? 'Conectado: ' + waService.connectedNumber() : 'Desconectado' }}</span>
-          <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-        </button>
+        <!-- WhatsApp Status Badge & Refresh Button -->
+        <div class="wa-status-group">
+          <div class="status-badge-pill" [class.connected]="waService.isConnected()">
+            <span class="dot" [class.dot-online]="waService.isConnected()"></span>
+            <span class="status-text">
+              {{ waService.isConnected() ? 'Conectado: ' + waService.connectedNumber() : 'WhatsApp Desconectado' }}
+            </span>
+          </div>
+
+          <button class="btn btn-outline btn-xs refresh-status-btn" 
+                  (click)="checkWhatsAppStatus()" 
+                  [disabled]="isCheckingStatus" 
+                  title="Comprobar estado actual en Evolution API">
+            <svg class="btn-svg" [class.spin-icon]="isCheckingStatus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span>Verificar Estado</span>
+          </button>
+        </div>
 
         <!-- User Profile Pill -->
         <div class="user-pill" *ngIf="authService.currentUserValue">
@@ -67,28 +81,6 @@ import { AuthService } from '../../core/services/auth.service';
         </button>
       </div>
     </header>
-
-    <!-- WhatsApp QR Connection Modal -->
-    <div class="modal-backdrop" *ngIf="showQrModal" (click)="showQrModal = false">
-      <div class="modal-card" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3>Conexión WhatsApp Web (QR)</h3>
-          <button class="close-btn" (click)="showQrModal = false">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="qr-placeholder">
-            <div class="qr-box">
-              <svg class="qr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            </div>
-            <p class="qr-text">Escanea el código QR con tu celular empresarial</p>
-            <small class="qr-sub">Línea vinculada: +51 961061471</small>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="showQrModal = false">Cerrar</button>
-        </div>
-      </div>
-    </div>
   `,
   styles: [`
     .header {
@@ -160,6 +152,60 @@ import { AuthService } from '../../core/services/auth.service';
       color: var(--accent-cyan);
       border: 1px solid var(--accent-cyan-glow);
     }
+    .wa-status-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .status-badge-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 10px;
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #ef4444;
+      font-size: 0.775rem;
+      font-weight: 600;
+    }
+    .status-badge-pill.connected {
+      background-color: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.25);
+      color: #22c55e;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #ef4444;
+      display: inline-block;
+    }
+    .dot-online {
+      background-color: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+    .refresh-status-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn-xs {
+      padding: 0.35rem 0.65rem;
+      font-size: 0.75rem;
+      border-radius: 8px;
+    }
+    .btn-svg {
+      width: 14px;
+      height: 14px;
+    }
+    .spin-icon {
+      animation: spin 0.6s ease-in-out infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .user-pill {
       display: flex;
       align-items: center;
@@ -198,91 +244,10 @@ import { AuthService } from '../../core/services/auth.service';
     .file-label {
       cursor: pointer;
     }
-    .btn-svg {
-      width: 16px;
-      height: 16px;
-    }
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: var(--status-error-text);
-      display: inline-block;
-    }
-    .dot-online {
-      background-color: #22c55e;
-      box-shadow: 0 0 8px #22c55e;
-    }
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background-color: var(--bg-modal-backdrop);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      backdrop-filter: blur(8px);
-    }
-    .modal-card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      width: 90%;
-      max-width: 400px;
-      padding: 1.5rem;
-      box-shadow: var(--shadow-cyan);
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    .close-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 1.2rem;
-      cursor: pointer;
-    }
-    .qr-placeholder {
-      text-align: center;
-      padding: 1rem 0;
-    }
-    .qr-box {
-      width: 180px;
-      height: 180px;
-      margin: 0 auto 1rem;
-      background: var(--bg-input);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 2px dashed var(--accent-cyan);
-      color: var(--accent-cyan);
-    }
-    .qr-svg {
-      width: 90px;
-      height: 90px;
-    }
-    .qr-text {
-      font-size: 0.85rem;
-      color: var(--text-primary);
-      margin-bottom: 0.25rem;
-    }
-    .qr-sub {
-      font-size: 0.725rem;
-      color: var(--text-muted);
-    }
-    .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 1rem;
-    }
   `]
 })
-export class HeaderComponent {
-  public showQrModal = false;
+export class HeaderComponent implements OnInit {
+  public isCheckingStatus = false;
 
   constructor(
     public themeService: ThemeService,
@@ -290,6 +255,26 @@ export class HeaderComponent {
     public waService: WhatsAppService,
     public authService: AuthService
   ) {}
+
+  ngOnInit(): void {
+    this.checkWhatsAppStatus();
+  }
+
+  public checkWhatsAppStatus(): void {
+    this.isCheckingStatus = true;
+    this.waService.getStatus().subscribe({
+      next: (info) => {
+        this.isCheckingStatus = false;
+        const isConn = info.status === 'CONNECTED';
+        this.waService.isConnected.set(isConn);
+        this.waService.connectedNumber.set(info.ownerJid || info.instanceName || 'WhatsApp Activo');
+      },
+      error: () => {
+        this.isCheckingStatus = false;
+        this.waService.isConnected.set(false);
+      }
+    });
+  }
 
   public onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;

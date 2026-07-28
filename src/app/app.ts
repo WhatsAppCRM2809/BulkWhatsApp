@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, Router } from '@angular/router';
 import { HeaderComponent } from './components/header/header.component';
@@ -20,16 +20,12 @@ import { AuthService } from './core/services/auth.service';
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class App implements OnInit {
+export class App {
   constructor(
     private excelService: ExcelService,
     public authService: AuthService,
     public router: Router
   ) {}
-
-  ngOnInit(): void {
-    this.excelService.loadMockData();
-  }
 
   isLoginPage(): boolean {
     return this.router.url.includes('/login');
