@@ -5,12 +5,14 @@ import { DataCleansingComponent } from './pages/data-cleansing/data-cleansing.co
 import { LogsComponent } from './pages/logs/logs.component';
 import { SettingsComponent } from './pages/settings/settings.component';
 import { UsersComponent } from './pages/users/users.component';
+import { WhatsappConnectComponent } from './pages/whatsapp-connect/whatsapp-connect.component';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: '', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'whatsapp', component: WhatsappConnectComponent, canActivate: [authGuard] },
   { path: 'data-cleansing', component: DataCleansingComponent, canActivate: [authGuard] },
   { path: 'logs', component: LogsComponent, canActivate: [authGuard] },
   { path: 'users', component: UsersComponent, canActivate: [authGuard, adminGuard] },

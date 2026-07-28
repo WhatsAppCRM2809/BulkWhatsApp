@@ -91,6 +91,55 @@ export class ExcelService {
   }
 
   /**
+   * Adds a new client manually to the database
+   */
+  public addManualContact(data: {
+    telefono: string;
+    nombre?: string;
+    ctaBt?: string;
+    producto?: string;
+    oferta?: number;
+    tasa?: number;
+    plazo?: number;
+    agencia?: string;
+  }): FinancialContact {
+    const rawPhone = data.telefono.trim();
+    const validPhone = this.normalizePhoneCascade(rawPhone, '');
+    const hasWA = validPhone.length >= 9;
+
+    const rawName = (data.nombre && data.nombre.trim()) ? data.nombre.trim() : 'Cliente Manual';
+    const nameParsed = this.cleanAndSplitName(rawName);
+
+    const newContact: FinancialContact = {
+      id: `CNT-MANUAL-${Date.now()}`,
+      ctaBt: (data.ctaBt && data.ctaBt.trim()) ? data.ctaBt.trim() : `CTA-${Math.floor(1000 + Math.random() * 9000)}`,
+      nombreCompleto: nameParsed.fullTitleCase,
+      primerNombre: nameParsed.primerNombre,
+      nombres: nameParsed.nombres,
+      apellidoPaterno: nameParsed.apellidoPaterno,
+      telefonoT1: rawPhone,
+      telefonoT2: '',
+      telefonoValido: validPhone,
+      hasWhatsApp: hasWA,
+      producto: (data.producto && data.producto.trim()) ? data.producto.trim() : 'Préstamo Personal',
+      oferta: data.oferta && data.oferta > 0 ? Number(data.oferta) : 15000,
+      tasa: data.tasa && data.tasa > 0 ? Number(data.tasa) : 35.0,
+      plazo: data.plazo && data.plazo > 0 ? Number(data.plazo) : 12,
+      agencia: (data.agencia && data.agencia.trim()) ? data.agencia.trim() : 'Ingreso Manual',
+      campana: 'Ingreso Manual',
+      estado: hasWA ? 'Pendiente' : 'Sin Telefono',
+      importedAt: new Date().toLocaleTimeString()
+    };
+
+    const currentList = this.allContacts();
+    const updatedList = [newContact, ...currentList];
+    this.updateState(updatedList);
+    this.selectedContact.set(newContact);
+
+    return newContact;
+  }
+
+  /**
    * Reads raw Excel file and handles INCREMENTAL APPEND vs REPLACE
    */
   public async parseExcelFile(file: File): Promise<void> {
@@ -137,17 +186,15 @@ export class ExcelService {
       let finalContacts: FinancialContact[] = [];
 
       if (this.importMode() === 'append') {
-        // Deduplicate by CTA BT if contact already exists, update offer, else append!
         const existingMap = new Map<string, FinancialContact>();
         this.allContacts().forEach(c => existingMap.set(c.ctaBt, c));
 
         newParsedContacts.forEach(c => {
-          existingMap.set(c.ctaBt, c); // inserts or updates existing account!
+          existingMap.set(c.ctaBt, c);
         });
 
         finalContacts = Array.from(existingMap.values());
       } else {
-        // Replace current list entirely
         finalContacts = newParsedContacts;
       }
 

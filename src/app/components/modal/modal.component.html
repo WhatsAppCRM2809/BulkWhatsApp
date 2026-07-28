@@ -35,9 +35,12 @@
     <h3 class="modal-title">{{ options.title }}</h3>
     <p class="modal-message">{{ options.message }}</p>
 
-    <!-- Footer Action -->
+    <!-- Footer Actions -->
     <div class="modal-actions">
-      <button class="btn-confirm" (click)="onClose()">
+      <button *ngIf="options.showCancel || options.cancelText" class="btn-cancel" (click)="onCancel()">
+        {{ options.cancelText || 'Cancelar' }}
+      </button>
+      <button class="btn-confirm" (click)="onConfirm()">
         {{ options.confirmText || 'Entendido' }}
       </button>
     </div>

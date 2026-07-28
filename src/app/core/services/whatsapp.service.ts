@@ -1,4 +1,7 @@
 import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { FinancialContact } from './excel.service';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
@@ -12,12 +15,24 @@ export interface CampaignStats {
   status: 'idle' | 'running' | 'paused' | 'completed';
 }
 
+export interface WhatsAppInstanceResponse {
+  id: number;
+  instanceName: string;
+  ownerJid?: string;
+  profileName?: string;
+  profilePicUrl?: string;
+  status: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
+  qrCodeBase64?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class WhatsAppService {
-  public isConnected = signal<boolean>(true);
-  public connectedNumber = signal<string>('+51 961061471');
+  private apiUrl = `${environment.apiUrl}/whatsapp`;
+
+  public isConnected = signal<boolean>(false);
+  public connectedNumber = signal<string>('Sin Vincular');
   public riskLevel = signal<RiskLevel>('low');
 
   public campaignStats = signal<CampaignStats>({
@@ -31,8 +46,26 @@ export class WhatsAppService {
 
   private intervalId: any = null;
 
-  constructor() {}
+  constructor(private http: HttpClient) {}
 
+  // Evolution API v2 Backend Services
+  createInstance(): Observable<WhatsAppInstanceResponse> {
+    return this.http.post<WhatsAppInstanceResponse>(`${this.apiUrl}/instance/create`, {});
+  }
+
+  getQrCode(): Observable<WhatsAppInstanceResponse> {
+    return this.http.get<WhatsAppInstanceResponse>(`${this.apiUrl}/instance/qr`);
+  }
+
+  getStatus(): Observable<WhatsAppInstanceResponse> {
+    return this.http.get<WhatsAppInstanceResponse>(`${this.apiUrl}/instance/status`);
+  }
+
+  logout(): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/instance/logout`);
+  }
+
+  // Campaign State & Risk Management
   public setRiskLevel(level: RiskLevel): void {
     this.riskLevel.set(level);
   }
@@ -79,7 +112,7 @@ export class WhatsAppService {
         sent: sentCount,
         progressPercent: progress
       }));
-    }, 1500); // Simulated fast intervals for UI demonstration
+    }, 1500);
   }
 
   public pauseCampaign(): void {
