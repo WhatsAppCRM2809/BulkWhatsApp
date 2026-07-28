@@ -1,8 +1,26 @@
 <div class="users-container">
   <div class="header-section">
     <div>
-      <h2 class="page-title">Gestión de Usuarios y Licencias</h2>
-      <p class="page-subtitle">Administra los asesores registrados y sus días de acceso al CRM SaaS</p>
+      <h2 class="page-title">Gestión de Usuarios y Licencias (Admin)</h2>
+      <p class="page-subtitle">Crea nuevos asesores con su correo Gmail, asigna licencias y administra accesos al CRM</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-refresh" (click)="loadAgents(true)" [disabled]="isLoading">
+        <svg class="btn-icon" [class.spin]="isLoading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>{{ isLoading ? 'Cargando...' : 'Recargar' }}</span>
+      </button>
+
+      <button class="btn btn-primary btn-create" (click)="toggleCreateModal()">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>{{ showCreateModal ? 'Cerrar Formulario' : 'Crear Usuario' }}</span>
+      </button>
     </div>
   </div>
 
@@ -11,11 +29,180 @@
     {{ message }}
   </div>
 
+  <!-- Create User Form Card -->
+  <div class="create-card" *ngIf="showCreateModal">
+    <div class="card-header">
+      <div class="header-with-icon">
+        <div class="icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <line x1="19" y1="8" x2="19" y2="14"></line>
+            <line x1="16" y1="11" x2="22" y2="11"></line>
+          </svg>
+        </div>
+        <div>
+          <h3>Registrar Nuevo Asesor / Usuario</h3>
+          <p class="card-subtitle">Solo requiere Nombre y Gmail. La contraseña por defecto es 123456</p>
+        </div>
+      </div>
+    </div>
+
+    <form (ngSubmit)="onCreateUser()" class="create-form">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="agentName">Nombre Completo del Agente <span class="required">*</span></label>
+          <input 
+            type="text" 
+            id="agentName" 
+            name="agentName" 
+            [(ngModel)]="newUser.agentName" 
+            placeholder="ej. Ana Gómez" 
+            required 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Correo Gmail <span class="required">*</span></label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            [(ngModel)]="newUser.email" 
+            placeholder="ej. anagomez@gmail.com" 
+            required 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Contraseña <span class="hint-text">(Vacío = 123456)</span></label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            [(ngModel)]="newUser.password" 
+            placeholder="123456 (por defecto)" 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="username">Nombre de Usuario <span class="hint-text">(Opcional / Auto-generado)</span></label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            [(ngModel)]="newUser.username" 
+            placeholder="ej. anagomez (por defecto derivado del Gmail)" 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="contactPhone">Teléfono de Contacto</label>
+          <input 
+            type="text" 
+            id="contactPhone" 
+            name="contactPhone" 
+            [(ngModel)]="newUser.contactPhone" 
+            placeholder="ej. 987654321" 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="initialDays">Días Iniciales de Licencia</label>
+          <input 
+            type="number" 
+            id="initialDays" 
+            name="initialDays" 
+            [(ngModel)]="newUser.initialDays" 
+            min="1" 
+            max="365" 
+            class="form-control"
+          />
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" (click)="toggleCreateModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+          <span *ngIf="!isSubmitting">Registrar Usuario</span>
+          <span *ngIf="isSubmitting">Guardando...</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div class="create-card edit-card" *ngIf="showEditModal && editingUser">
+    <div class="card-header">
+      <div class="header-with-icon">
+        <div class="icon-badge edit-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </div>
+        <div>
+          <h3>Editar Usuario: {{ editingUser.username }}</h3>
+          <p class="card-subtitle">Modifica el correo Gmail, nombre del agente y rol administrativo</p>
+        </div>
+      </div>
+    </div>
+
+    <form (ngSubmit)="onSaveEdit()" class="create-form">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="editAgentName">Nombre del Agente</label>
+          <input 
+            type="text" 
+            id="editAgentName" 
+            name="editAgentName" 
+            [(ngModel)]="editingUser.agentName" 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="editEmail">Correo Gmail</label>
+          <input 
+            type="email" 
+            id="editEmail" 
+            name="editEmail" 
+            [(ngModel)]="editingUser.email" 
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="editRole">Rol de Sistema</label>
+          <select id="editRole" name="editRole" [(ngModel)]="editingUser.role" class="form-control">
+            <option value="ROLE_AGENT">Asesor de Crédito (ROLE_AGENT)</option>
+            <option value="ROLE_ADMIN">Administrador (ROLE_ADMIN)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" (click)="closeEditModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+          <span *ngIf="!isSubmitting">Guardar Cambios</span>
+          <span *ngIf="isSubmitting">Actualizando...</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
   <!-- Users Data Table -->
   <div class="table-card">
     <div class="table-header">
-      <h3>Lista de Usuarios y Roles</h3>
-      <span class="user-count">{{ agents.length }} Asesores Registrados</span>
+      <div class="table-title-group">
+        <h3>Lista de Usuarios Existentes</h3>
+        <span class="user-count">{{ agents.length }} Usuarios Registrados</span>
+      </div>
     </div>
 
     <div class="table-responsive">
@@ -23,22 +210,22 @@
         <thead>
           <tr>
             <th>ID</th>
-            <th>Usuario</th>
             <th>Nombre del Agente</th>
-            <th>Correo Electrónico</th>
+            <th>Correo Gmail</th>
+            <th>Nombre de Usuario</th>
             <th>Rol</th>
             <th>Días Restantes</th>
             <th>Vencimiento</th>
             <th>Estado</th>
-            <th>Acciones de Licencia</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let agent of agents">
             <td>#{{ agent.userId }}</td>
-            <td class="font-bold">{{ agent.username }}</td>
-            <td>{{ agent.agentName || 'N/A' }}</td>
+            <td class="font-bold text-highlight">{{ agent.agentName || 'Sin Nombre' }}</td>
             <td>{{ agent.email }}</td>
+            <td class="font-mono text-cyan">{{ agent.username }}</td>
             <td>
               <span [class]="agent.role === 'ROLE_ADMIN' ? 'badge badge-admin' : 'badge badge-agent'">
                 {{ agent.role === 'ROLE_ADMIN' ? 'Administrador' : 'Asesor de Crédito' }}
@@ -49,24 +236,31 @@
                 {{ agent.daysRemaining }} Días
               </span>
             </td>
-            <td>{{ agent.expiresAt | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ formatDate(agent.expiresAt) }}</td>
             <td>
               <span [class]="agent.status === 'ACTIVE' ? 'status-dot active' : 'status-dot expired'"></span>
               {{ agent.status === 'ACTIVE' ? 'Activo' : 'Expirado' }}
             </td>
             <td>
               <div class="action-buttons">
+                <button class="btn btn-edit" (click)="openEditModal(agent)" title="Editar usuario y rol">
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  <span>Editar</span>
+                </button>
                 <button class="btn btn-add-days" (click)="onAddDays(agent.userId, 30)">
-                  +30 Días
+                  +30d
                 </button>
                 <button class="btn btn-add-days-plus" (click)="onAddDays(agent.userId, 90)">
-                  +90 Días
+                  +90d
                 </button>
               </div>
             </td>
           </tr>
           <tr *ngIf="agents.length === 0 && !isLoading">
-            <td colspan="9" class="empty-message">No hay usuarios o asesores registrados.</td>
+            <td colspan="9" class="empty-message">No hay usuarios o asesores registrados en el sistema.</td>
           </tr>
         </tbody>
       </table>

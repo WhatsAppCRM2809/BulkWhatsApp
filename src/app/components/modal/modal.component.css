@@ -1,0 +1,116 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 15, 29, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.modal-card {
+  background: linear-gradient(145deg, rgba(23, 31, 56, 0.95), rgba(16, 22, 42, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  max-width: 440px;
+  width: 100%;
+  padding: 2.2rem;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 210, 255, 0.08);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.modal-icon-container {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 1.4rem auto;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.1);
+}
+
+.modal-icon-container.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.modal-icon-container.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.modal-icon-container.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.modal-icon-container.info {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.modal-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.modal-title {
+  color: #f8fafc;
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+.modal-message {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1.8rem;
+}
+
+.btn-confirm {
+  width: 100%;
+  padding: 0.85rem 1.5rem;
+  background: linear-gradient(135deg, #00d2ff 0%, #0072ff 100%);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 114, 255, 0.35);
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-confirm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 114, 255, 0.5);
+}
+
+.btn-confirm:active {
+  transform: translateY(0);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.85) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}

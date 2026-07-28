@@ -11,10 +11,21 @@ export interface AuthResponse {
   username: string;
   email: string;
   agentName: string;
+  bankAgency?: string;
   role: string;
   daysRemaining: number;
   expiresAt: string;
   status: string;
+}
+
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  agentName: string;
+  bankAgency?: string;
+  contactPhone?: string;
+  initialDays?: number;
 }
 
 @Injectable({
@@ -43,6 +54,12 @@ export class AuthService {
     );
   }
 
+  registerAgent(data: RegisterRequest): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
   logout(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -62,17 +79,29 @@ export class AuthService {
   }
 
   getAllAgents(): Observable<AuthResponse[]> {
-    const token = localStorage.getItem('token');
     return this.http.get<AuthResponse[]>(`${this.apiUrl}/agents`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: this.getAuthHeaders()
     });
   }
 
   addDaysToAgent(userId: number, days: number): Observable<AuthResponse> {
-    const token = localStorage.getItem('token');
     return this.http.put<AuthResponse>(`${this.apiUrl}/agents/${userId}/add-days?additionalDays=${days}`, {}, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: this.getAuthHeaders()
     });
+  }
+
+  updateAgent(userId: number, data: { email?: string; agentName?: string; bankAgency?: string; role?: string }): Observable<AuthResponse> {
+    return this.http.put<AuthResponse>(`${this.apiUrl}/agents/${userId}`, data, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  private getAuthHeaders(): { [header: string]: string } {
+    const token = localStorage.getItem('token');
+    if (token && token !== 'null' && token !== 'undefined') {
+      return { Authorization: `Bearer ${token}` };
+    }
+    return {};
   }
 
   private getStoredUser(): AuthResponse | null {

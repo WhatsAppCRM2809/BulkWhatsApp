@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterOutlet, Router } from '@angular/router';
 import { HeaderComponent } from './components/header/header.component';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
+import { ModalComponent } from './components/modal/modal.component';
 import { ExcelService } from './core/services/excel.service';
 import { AuthService } from './core/services/auth.service';
 
@@ -13,7 +14,8 @@ import { AuthService } from './core/services/auth.service';
     CommonModule,
     RouterOutlet,
     HeaderComponent,
-    SidebarComponent
+    SidebarComponent,
+    ModalComponent
   ],
   templateUrl: './app.html',
   styleUrl: './app.css'
