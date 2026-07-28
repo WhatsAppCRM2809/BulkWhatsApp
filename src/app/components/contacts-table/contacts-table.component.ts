@@ -51,7 +51,7 @@ import { ModalService } from '../../core/services/modal.service';
         <div class="search-box">
           <div class="search-input-wrapper">
             <svg class="search-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" class="form-control search-input" placeholder="Buscar cliente, CTA, agencia..." [(ngModel)]="searchQuery" />
+            <input type="text" class="form-control search-input" placeholder="Buscar cliente, DNI, CTA, agencia..." [ngModel]="searchQuery()" (ngModelChange)="onSearchChange($event)" />
           </div>
         </div>
       </div>
@@ -61,21 +61,36 @@ import { ModalService } from '../../core/services/modal.service';
         <table class="data-table">
           <thead>
             <tr>
-              <th>DOC / DNI</th>
+              <th (click)="toggleSort('doc')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'doc'">
+                DOC / DNI
+                <span class="sort-icon" *ngIf="sortColumn() === 'doc'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
               <th>CTA BT</th>
-              <th>Nombre Completo (Limpio)</th>
+              <th (click)="toggleSort('nombreCompleto')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'nombreCompleto'">
+                Nombre Completo (Limpio)
+                <span class="sort-icon" *ngIf="sortColumn() === 'nombreCompleto'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
               <th>Teléfono Envío</th>
-              <th>Propensión</th>
+              <th (click)="toggleSort('propension')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'propension'" title="Clic para ordenar por Propensión Alta/Baja">
+                Propensión
+                <span class="sort-icon" *ngIf="sortColumn() === 'propension'">{{ sortDirection() === 'desc' ? '▼ (Mayor a Menor)' : '▲ (Menor a Mayor)' }}</span>
+              </th>
               <th>Producto</th>
-              <th>Oferta (S/)</th>
-              <th>Tasa (%)</th>
+              <th (click)="toggleSort('oferta')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'oferta'">
+                Oferta (S/)
+                <span class="sort-icon" *ngIf="sortColumn() === 'oferta'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
+              <th (click)="toggleSort('tasa')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'tasa'">
+                Tasa (%)
+                <span class="sort-icon" *ngIf="sortColumn() === 'tasa'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
               <th>Plazo</th>
               <th>Agencia</th>
               <th>Estado</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let contact of filteredContacts()" 
+            <tr *ngFor="let contact of paginatedContacts()" 
                 [class.selected-row]="excelService.selectedContact()?.id === contact.id"
                 (click)="excelService.selectedContact.set(contact)"
                 class="clickable-row">
@@ -97,7 +112,7 @@ import { ModalService } from '../../core/services/modal.service';
               </td>
               <td>
                 <span class="badge badge-propension" *ngIf="contact.propension !== undefined && contact.propension !== ''">
-                  🔥 {{ contact.propension }}
+                  {{ contact.propension }}
                 </span>
                 <span class="text-muted" *ngIf="contact.propension === undefined || contact.propension === ''">-</span>
               </td>
@@ -121,14 +136,47 @@ import { ModalService } from '../../core/services/modal.service';
               <td colspan="11" class="empty-state-cell">
                 <div class="empty-state">
                   <svg class="empty-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <p class="empty-title" *ngIf="searchQuery.trim().length > 0">No se encontraron clientes para "{{ searchQuery }}"</p>
-                  <p class="empty-title" *ngIf="searchQuery.trim().length === 0">No hay contactos cargados en la base de datos</p>
+                  <p class="empty-title" *ngIf="searchQuery().trim().length > 0">No se encontraron clientes para "{{ searchQuery() }}"</p>
+                  <p class="empty-title" *ngIf="searchQuery().trim().length === 0">No hay contactos cargados en la base de datos</p>
                   <p class="empty-sub">Importa una base de datos Excel (.xlsx, .csv) o haz clic en "Agregar Cliente".</p>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      <div class="pagination-footer" *ngIf="filteredContacts().length > 0">
+        <div class="page-size-selector">
+          <span>Mostrar</span>
+          <select class="form-control page-size-select" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+            <option [value]="10">10 por pág.</option>
+            <option [value]="25">25 por pág.</option>
+            <option [value]="50">50 por pág.</option>
+            <option [value]="100">100 por pág.</option>
+            <option [value]="500">500 por pág.</option>
+          </select>
+          <span class="pagination-info">
+            Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ filteredContacts().length }} clientes
+          </span>
+        </div>
+
+        <div class="pagination-buttons">
+          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Primera página">
+            &laquo;
+          </button>
+          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Anterior">
+            &lt;
+          </button>
+          <span class="page-indicator">Página {{ currentPage() }} de {{ totalPages() }}</span>
+          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Siguiente">
+            &gt;
+          </button>
+          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Última página">
+            &raquo;
+          </button>
+        </div>
       </div>
     </div>
 
@@ -329,6 +377,23 @@ import { ModalService } from '../../core/services/modal.service';
       border-bottom: 1px solid var(--border-color);
       white-space: nowrap;
     }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+      transition: var(--transition);
+    }
+    .sortable-header:hover {
+      color: var(--accent-cyan);
+      background-color: var(--bg-hover);
+    }
+    .active-sort-th {
+      color: var(--accent-cyan) !important;
+      font-weight: 800 !important;
+    }
+    .sort-icon {
+      font-size: 0.75rem;
+      margin-left: 0.25rem;
+    }
     .data-table td {
       padding: 0.75rem 1rem;
       border-bottom: 1px solid var(--border-color);
@@ -500,11 +565,61 @@ import { ModalService } from '../../core/services/modal.service';
       justify-content: flex-end;
       gap: 0.75rem;
     }
+    
+    /* Pagination Styles */
+    .pagination-footer {
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      background-color: var(--bg-tertiary);
+    }
+    .page-size-selector {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.825rem;
+      color: var(--text-secondary);
+    }
+    .page-size-select {
+      width: auto;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.8rem;
+    }
+    .pagination-info {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .pagination-buttons {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .nav-page-btn {
+      padding: 0.35rem 0.65rem;
+      font-size: 0.8rem;
+      min-width: 32px;
+    }
+    .page-indicator {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      padding: 0 0.5rem;
+    }
   `]
 })
 export class ContactsTableComponent {
   public activeTab = signal<'valid' | 'invalid'>('valid');
-  public searchQuery = '';
+  public searchQuery = signal<string>('');
+
+  public pageSize = signal<number>(50);
+  public currentPage = signal<number>(1);
+
+  public sortColumn = signal<'propension' | 'oferta' | 'nombreCompleto' | 'doc' | 'tasa' | 'none'>('propension');
+  public sortDirection = signal<'asc' | 'desc'>('desc');
 
   public showAddModal = false;
   public newContactForm = {
@@ -523,22 +638,104 @@ export class ContactsTableComponent {
     private modalService: ModalService
   ) {}
 
+  public onSearchChange(query: string): void {
+    this.searchQuery.set(query || '');
+    this.currentPage.set(1);
+  }
+
+  public toggleSort(col: 'propension' | 'oferta' | 'nombreCompleto' | 'doc' | 'tasa'): void {
+    if (this.sortColumn() === col) {
+      this.sortDirection.set(this.sortDirection() === 'desc' ? 'asc' : 'desc');
+    } else {
+      this.sortColumn.set(col);
+      this.sortDirection.set('desc');
+    }
+    this.currentPage.set(1);
+  }
+
   public filteredContacts = computed(() => {
-    const list = this.activeTab() === 'valid' 
+    const rawList = this.activeTab() === 'valid' 
       ? this.excelService.validContacts() 
       : this.excelService.invalidContacts();
 
-    if (!this.searchQuery.trim()) return list;
+    let list = rawList;
+    const q = this.searchQuery().toLowerCase().trim();
 
-    const q = this.searchQuery.toLowerCase().trim();
-    return list.filter(c => 
-      c.nombreCompleto.toLowerCase().includes(q) ||
-      c.ctaBt.toLowerCase().includes(q) ||
-      c.telefonoT1.includes(q) ||
-      c.telefonoValido.includes(q) ||
-      c.agencia.toLowerCase().includes(q)
-    );
+    if (q.length > 0) {
+      list = rawList.filter(c => 
+        c.nombreCompleto.toLowerCase().includes(q) ||
+        (c.doc && c.doc.toLowerCase().includes(q)) ||
+        c.ctaBt.toLowerCase().includes(q) ||
+        c.telefonoT1.includes(q) ||
+        c.telefonoValido.includes(q) ||
+        c.agencia.toLowerCase().includes(q) ||
+        (c.propension !== undefined && String(c.propension).toLowerCase().includes(q))
+      );
+    } else {
+      list = [...rawList];
+    }
+
+    const col = this.sortColumn();
+    const dir = this.sortDirection() === 'desc' ? -1 : 1;
+
+    if (col !== 'none') {
+      list.sort((a, b) => {
+        if (col === 'propension') {
+          const valA = Number(a.propension) || 0;
+          const valB = Number(b.propension) || 0;
+          return (valA - valB) * dir;
+        }
+        if (col === 'oferta') {
+          return ((a.oferta || 0) - (b.oferta || 0)) * dir;
+        }
+        if (col === 'tasa') {
+          return ((a.tasa || 0) - (b.tasa || 0)) * dir;
+        }
+        if (col === 'nombreCompleto') {
+          return a.nombreCompleto.localeCompare(b.nombreCompleto) * dir;
+        }
+        if (col === 'doc') {
+          return (a.doc || '').localeCompare(b.doc || '') * dir;
+        }
+        return 0;
+      });
+    }
+
+    return list;
   });
+
+  public totalPages = computed(() => {
+    return Math.ceil(this.filteredContacts().length / this.pageSize()) || 1;
+  });
+
+  public paginatedContacts = computed(() => {
+    const list = this.filteredContacts();
+    const page = this.currentPage();
+    const size = this.pageSize();
+    const start = (page - 1) * size;
+    return list.slice(start, start + size);
+  });
+
+  public onPageSizeChange(newSize: any): void {
+    this.pageSize.set(Number(newSize));
+    this.currentPage.set(1);
+  }
+
+  public goToPage(page: number): void {
+    if (page < 1) page = 1;
+    if (page > this.totalPages()) page = this.totalPages();
+    this.currentPage.set(page);
+  }
+
+  public getStartIndex(): number {
+    if (this.filteredContacts().length === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  }
+
+  public getEndIndex(): number {
+    const end = this.currentPage() * this.pageSize();
+    return end > this.filteredContacts().length ? this.filteredContacts().length : end;
+  }
 
   public onExportContacts(): void {
     const list = this.filteredContacts();

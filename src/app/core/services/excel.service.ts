@@ -158,46 +158,107 @@ export class ExcelService {
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
 
-        const jsonRows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        // First check if file has header row by reading raw array of arrays
+        const matrixRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        if (matrixRows.length === 0) {
+          this.isProcessing.set(false);
+          return;
+        }
 
-        const newParsedContacts: FinancialContact[] = jsonRows.map((row, index) => {
-          const rawName = String(row['NOMBRE'] || row['Cliente'] || row['Nombre'] || row['NOMBRES'] || 'Cliente');
-          const nameParsed = this.cleanAndSplitName(rawName);
+        const firstRow = matrixRows[0];
+        const firstRowStr = firstRow.map(cell => String(cell).toUpperCase().trim()).join(' ');
 
-          const rawT1 = String(row['T1'] || row['Telefono'] || row['TELEFONO'] || row['Celular'] || '');
-          const rawT2 = String(row['T2'] || row['Telefono2'] || row['TELEFONO2'] || '');
+        // Check if first row contains header keywords
+        const hasHeaders = ['DOC', 'DNI', 'CTA', 'NOMBRE', 'PRODUCTO', 'T1', 'OFERTA', 'TASA', 'PROPENSION', 'AGENCIA']
+          .some(keyword => firstRowStr.includes(keyword));
 
-          const validPhone = this.normalizePhoneCascade(rawT1, rawT2);
-          const hasWA = validPhone.length >= 9;
+        let newParsedContacts: FinancialContact[] = [];
 
-          return {
-            id: `CNT-${Date.now()}-${index}`,
-            ctaBt: String(row['CTA BT'] || row['CtaBt'] || row['CUENTA'] || `AUT-${index}`),
-            doc: String(row['DOC'] || row['Doc'] || row['DNI'] || row['Dni'] || ''),
-            nombreCompleto: nameParsed.fullTitleCase,
-            primerNombre: nameParsed.primerNombre,
-            nombres: nameParsed.nombres,
-            apellidoPaterno: nameParsed.apellidoPaterno,
-            direccion: String(row['DIRECCION'] || row['Direccion'] || ''),
-            distrito: String(row['DISTRITO'] || row['Distrito'] || ''),
-            departamento: String(row['DEPARTAMENTO'] || row['Departamento'] || ''),
-            telefonoT1: rawT1,
-            telefonoT2: rawT2,
-            telefonoValido: validPhone,
-            hasWhatsApp: hasWA,
-            producto: String(row['PRODUCTO'] || row['Producto'] || 'Préstamo Personal'),
-            oferta: Number(row['OFERTA'] || row['Oferta'] || row['MONTO'] || 15000),
-            tasa: Number(row['TASA'] || row['Tasa'] || 39.5),
-            plazo: Number(row['PLAZOMIN'] || row['PLAZO'] || row['Plazo'] || 12),
-            agencia: String(row['AGENCIA'] || row['Agencia'] || 'Agencia Principal'),
-            campana: String(row['NOMB_CAMPAÑA'] || row['CAMPAÑA'] || `Campaña ${file.name}`),
-            propension: row['PROPENSION'] !== undefined && row['PROPENSION'] !== '' ? row['PROPENSION'] : (row['Propension'] || ''),
-            edad: Number(row['EDAD'] || row['Edad'] || 0),
-            combo: String(row['COMBO'] || row['Combo'] || ''),
-            estado: hasWA ? 'Pendiente' : 'Sin Telefono',
-            importedAt: new Date().toLocaleTimeString()
-          };
-        });
+        if (hasHeaders) {
+          // Standard Header-Based Parsing
+          const jsonRows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+          newParsedContacts = jsonRows.map((row, index) => {
+            const rawName = String(row['NOMBRE'] || row['Cliente'] || row['Nombre'] || row['NOMBRES'] || 'Cliente');
+            const nameParsed = this.cleanAndSplitName(rawName);
+
+            const rawT1 = String(row['T1'] || row['Telefono'] || row['TELEFONO'] || row['Celular'] || '');
+            const rawT2 = String(row['T2'] || row['Telefono2'] || row['TELEFONO2'] || row['Celular2'] || '');
+            const rawT3 = String(row['T3'] || row['Telefono3'] || row['TELEFONO3'] || row['Celular3'] || '');
+            const rawT4 = String(row['T4'] || row['Telefono4'] || row['TELEFONO4'] || row['Celular4'] || '');
+
+            const validPhone = this.normalizePhoneCascade(rawT1, rawT2, rawT3, rawT4);
+            const hasWA = validPhone.length >= 9;
+
+            return {
+              id: `CNT-${Date.now()}-${index}`,
+              ctaBt: String(row['CTA BT'] || row['CtaBt'] || row['CUENTA'] || `AUT-${index}`),
+              doc: String(row['DOC'] || row['Doc'] || row['DNI'] || row['Dni'] || ''),
+              nombreCompleto: nameParsed.fullTitleCase,
+              primerNombre: nameParsed.primerNombre,
+              nombres: nameParsed.nombres,
+              apellidoPaterno: nameParsed.apellidoPaterno,
+              direccion: String(row['DIRECCION'] || row['Direccion'] || ''),
+              distrito: String(row['DISTRITO'] || row['Distrito'] || ''),
+              departamento: String(row['DEPARTAMENTO'] || row['Departamento'] || ''),
+              telefonoT1: rawT1,
+              telefonoT2: rawT2,
+              telefonoValido: validPhone,
+              hasWhatsApp: hasWA,
+              producto: String(row['PRODUCTO'] || row['Producto'] || 'Préstamo Personal'),
+              oferta: Number(row['OFERTA'] || row['Oferta'] || row['MONTO'] || 15000),
+              tasa: Number(row['TASA'] || row['Tasa'] || 39.5),
+              plazo: Number(row['PLAZOMIN'] || row['PLAZO'] || row['Plazo'] || 12),
+              agencia: String(row['AGENCIA'] || row['Agencia'] || 'Agencia Principal'),
+              campana: String(row['NOMB_CAMPAÑA'] || row['CAMPAÑA'] || `Campaña ${file.name}`),
+              propension: row['PROPENSION'] !== undefined && row['PROPENSION'] !== '' ? row['PROPENSION'] : (row['Propension'] || ''),
+              edad: Number(row['EDAD'] || row['Edad'] || 0),
+              combo: String(row['COMBO'] || row['Combo'] || ''),
+              estado: hasWA ? 'Pendiente' : 'Sin Telefono',
+              importedAt: new Date().toLocaleTimeString()
+            };
+          });
+        } else {
+          // Positional Headerless Parsing (Standard Bank Structure)
+          newParsedContacts = matrixRows.map((rowArr, index) => {
+            const rawName = String(rowArr[2] || rowArr[1] || 'Cliente');
+            const nameParsed = this.cleanAndSplitName(rawName);
+
+            const rawT1 = String(rowArr[6] || rowArr[5] || '');
+            const rawT2 = String(rowArr[7] || '');
+            const rawT3 = String(rowArr[8] && String(rowArr[8]).startsWith('9') ? rowArr[8] : '');
+
+            const validPhone = this.normalizePhoneCascade(rawT1, rawT2, rawT3);
+            const hasWA = validPhone.length >= 9;
+
+            return {
+              id: `CNT-${Date.now()}-${index}`,
+              doc: String(rowArr[0] || ''),
+              ctaBt: String(rowArr[1] || `AUT-${index}`),
+              nombreCompleto: nameParsed.fullTitleCase,
+              primerNombre: nameParsed.primerNombre,
+              nombres: nameParsed.nombres,
+              apellidoPaterno: nameParsed.apellidoPaterno,
+              direccion: String(rowArr[3] || ''),
+              distrito: String(rowArr[4] || ''),
+              departamento: String(rowArr[5] || ''),
+              telefonoT1: rawT1,
+              telefonoT2: rawT2,
+              telefonoValido: validPhone,
+              hasWhatsApp: hasWA,
+              producto: String(rowArr[8] || 'Préstamo Personal'),
+              oferta: Number(rowArr[9] || 15000),
+              tasa: Number(rowArr[10] || 39.5),
+              plazo: Number(rowArr[11] || 12),
+              combo: String(rowArr[12] || ''),
+              campana: String(rowArr[13] || `Campaña ${file.name}`),
+              propension: rowArr[14] !== undefined && rowArr[14] !== null ? String(rowArr[14]) : '',
+              edad: Number(rowArr[15] || 0),
+              agencia: String(rowArr[16] || 'Agencia Principal'),
+              estado: hasWA ? 'Pendiente' : 'Sin Telefono',
+              importedAt: new Date().toLocaleTimeString()
+            };
+          });
+        }
 
         let finalContacts: FinancialContact[] = [];
 
@@ -282,23 +343,27 @@ export class ExcelService {
   }
 
   /**
-   * Checks T1 first, then T2, ensuring Peru 9-digit format (adds 51 prefix)
+   * Checks candidate phone numbers in sequence (T1 -> T2 -> T3 -> T4), returning the first valid 9-digit Peruvian mobile
    */
-  private normalizePhoneCascade(t1: string, t2: string): string {
-    const cleanT1 = (t1 || '').replace(/\D/g, '');
-    const cleanT2 = (t2 || '').replace(/\D/g, '');
-
+  public normalizePhoneCascade(...candidatePhones: string[]): string {
     const isValidPeruvianCell = (p: string) => (p.length === 9 && p.startsWith('9')) || (p.length === 11 && p.startsWith('519'));
 
-    if (isValidPeruvianCell(cleanT1)) {
-      return cleanT1.length === 9 ? `51${cleanT1}` : cleanT1;
-    }
-    if (isValidPeruvianCell(cleanT2)) {
-      return cleanT2.length === 9 ? `51${cleanT2}` : cleanT2;
+    for (const phoneStr of candidatePhones) {
+      if (!phoneStr) continue;
+      const clean = String(phoneStr).replace(/\D/g, '');
+      if (isValidPeruvianCell(clean)) {
+        return clean.length === 9 ? `51${clean}` : clean;
+      }
     }
 
-    if (cleanT1.length > 0) return cleanT1.length === 9 ? `51${cleanT1}` : cleanT1;
-    if (cleanT2.length > 0) return cleanT2.length === 9 ? `51${cleanT2}` : cleanT2;
+    // Fallback if no 9-digit cell found, return first non-empty clean number
+    for (const phoneStr of candidatePhones) {
+      if (!phoneStr) continue;
+      const clean = String(phoneStr).replace(/\D/g, '');
+      if (clean.length >= 7) {
+        return clean.length === 9 ? `51${clean}` : clean;
+      }
+    }
 
     return '';
   }
