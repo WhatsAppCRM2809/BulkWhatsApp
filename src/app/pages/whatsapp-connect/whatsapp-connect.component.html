@@ -1,0 +1,90 @@
+<div class="whatsapp-container">
+
+  <!-- Header Section -->
+  <div class="header-banner">
+    <div class="header-title-box">
+      <div class="whatsapp-badge">
+        <svg class="wsp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+        </svg>
+        <span>Evolution API v2</span>
+      </div>
+      <h2>Conexión de Instancia de WhatsApp</h2>
+      <p>Vincule su número de WhatsApp escaneando el código QR para enviar mensajes masivos y gestionar respuestas.</p>
+    </div>
+  </div>
+
+  <!-- Status & QR Card -->
+  <div class="card-glass content-card">
+
+    <!-- State 1: DISCONNECTED -->
+    <div *ngIf="!instanceInfo || instanceInfo.status === 'DISCONNECTED'" class="state-box">
+      <div class="status-indicator disconnected">
+        <span class="pulse-dot red"></span>
+        <span>Estado: <strong>Desconectado</strong></span>
+      </div>
+
+      <div class="action-box">
+        <p class="description-text">
+          Genera un código QR dinámico para escanearlo desde la app de WhatsApp de tu celular (Ajustes > Dispositivos Vinculados).
+        </p>
+        <button class="btn btn-connect" (click)="generateQrCode()" [disabled]="isGeneratingQr">
+          <span *ngIf="!isGeneratingQr">📲 Generar Código QR de Vinculación</span>
+          <span *ngIf="isGeneratingQr">🔄 Generando QR con Evolution API...</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- State 2: CONNECTING / QR GENERATED -->
+    <div *ngIf="instanceInfo && instanceInfo.status === 'CONNECTING'" class="state-box">
+      <div class="status-indicator connecting">
+        <span class="pulse-dot yellow"></span>
+        <span>Estado: <strong>Esperando Escaneo de QR...</strong></span>
+      </div>
+
+      <div class="qr-display-box" *ngIf="qrCodeBase64">
+        <div class="qr-frame">
+          <img [src]="qrCodeBase64.startsWith('data:') ? qrCodeBase64 : 'data:image/png;base64,' + qrCodeBase64" alt="Código QR WhatsApp" class="qr-img" />
+        </div>
+        <p class="qr-instructions">
+          1. Abre WhatsApp en tu teléfono.<br>
+          2. Toca <strong>Menú (⋮)</strong> o <strong>Configuración</strong> y selecciona <strong>Dispositivos vinculados</strong>.<br>
+          3. Toca <strong>Vincular un dispositivo</strong> y apunta tu cámara hacia esta pantalla.
+        </p>
+      </div>
+
+      <div class="polling-info">
+        <div class="spinner"></div>
+        <span>Comprobando vinculación en tiempo real...</span>
+      </div>
+    </div>
+
+    <!-- State 3: CONNECTED -->
+    <div *ngIf="instanceInfo && instanceInfo.status === 'CONNECTED'" class="state-box">
+      <div class="status-indicator connected">
+        <span class="pulse-dot green"></span>
+        <span>Estado: <strong>Conectado y Operativo</strong></span>
+      </div>
+
+      <div class="profile-card">
+        <div class="avatar-circle">
+          <img *ngIf="instanceInfo.profilePicUrl" [src]="instanceInfo.profilePicUrl" alt="Foto WhatsApp" />
+          <span *ngIf="!instanceInfo.profilePicUrl">📱</span>
+        </div>
+        <div class="profile-details">
+          <h4>{{ instanceInfo.profileName || 'WhatsApp Vinculado' }}</h4>
+          <p class="phone-number">{{ instanceInfo.ownerJid || 'Número Activo' }}</p>
+          <span class="badge badge-active">Instancia: {{ instanceInfo.instanceName }}</span>
+        </div>
+      </div>
+
+      <div class="connected-actions">
+        <button class="btn btn-danger" (click)="onLogoutWhatsApp()" [disabled]="isLoading">
+          🔴 Desconectar Sesión de WhatsApp
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+</div>

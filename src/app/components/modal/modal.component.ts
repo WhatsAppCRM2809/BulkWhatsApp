@@ -19,14 +19,23 @@ export class ModalComponent implements OnInit {
 
   ngOnInit(): void {
     this.modalService.modal$.subscribe(opts => {
-      console.log('🔔 Modal Pop-up activado:', opts);
       this.options = opts;
       this.cdr.detectChanges();
     });
   }
 
+  onConfirm(): void {
+    this.modalService.confirm();
+    this.cdr.detectChanges();
+  }
+
+  onCancel(): void {
+    this.modalService.cancel();
+    this.cdr.detectChanges();
+  }
+
   onClose(): void {
-    this.modalService.close();
+    this.modalService.cancel();
     this.cdr.detectChanges();
   }
 }

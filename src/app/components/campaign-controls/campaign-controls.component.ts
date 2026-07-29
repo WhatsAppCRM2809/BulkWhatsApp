@@ -68,7 +68,7 @@ import { ExcelService } from '../../core/services/excel.service';
 
       <!-- Post Campaign Download Report -->
       <div class="report-zone" *ngIf="waService.campaignStats().status === 'completed'">
-        <span class="report-success">Campaña Finalizada Exitosamente</span>
+        <span class="report-success">Campaña Finalizada Exitosamente (Enviados: {{ waService.campaignStats().sent }} | Fallidos: {{ waService.campaignStats().failed }})</span>
         <button class="btn btn-outline btn-sm" (click)="downloadFinalReport()">
           <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>Descargar Reporte Final (.xlsx)</span>
@@ -208,13 +208,15 @@ export class CampaignControlsComponent {
   public onStartCampaign(): void {
     const valid = this.excelService.validContacts();
     if (valid.length === 0) {
-      alert('¡Debes cargar un archivo Excel o datos de prueba antes de iniciar!');
+      alert('¡Debes cargar un archivo Excel o ingresar clientes manualmente antes de iniciar!');
       return;
     }
-    this.waService.startCampaign(valid, 'Template');
+    this.waService.startCampaign(valid);
   }
 
   public downloadFinalReport(): void {
-    alert('Descargando Reporte Final de Campaña en Excel (.xlsx)');
+    const valid = this.excelService.validContacts();
+    const timestamp = new Date().toISOString().slice(0, 10);
+    this.excelService.exportContactsToExcel(valid, `Reporte_Final_Campana_${timestamp}.xlsx`);
   }
 }

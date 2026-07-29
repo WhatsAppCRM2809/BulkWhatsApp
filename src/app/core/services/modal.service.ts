@@ -1,12 +1,15 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 
 export interface ModalOptions {
   title: string;
   message: string;
   type?: 'warning' | 'error' | 'success' | 'info';
   confirmText?: string;
+  cancelText?: string;
+  showCancel?: boolean;
   onConfirm?: () => void;
+  onCancel?: () => void;
 }
 
 @Injectable({
@@ -21,10 +24,22 @@ export class ModalService {
   }
 
   close(): void {
+    this.modalSubject.next(null);
+  }
+
+  confirm(): void {
     const current = this.modalSubject.value;
     if (current && current.onConfirm) {
       current.onConfirm();
     }
-    this.modalSubject.next(null);
+    this.close();
+  }
+
+  cancel(): void {
+    const current = this.modalSubject.value;
+    if (current && current.onCancel) {
+      current.onCancel();
+    }
+    this.close();
   }
 }
