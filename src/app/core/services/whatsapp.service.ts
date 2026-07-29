@@ -167,6 +167,18 @@ export class WhatsAppService {
     text = text.replace(/\{EDAD\}|\{edad\}/g, contact.edad ? String(contact.edad) : '');
     text = text.replace(/\{COMBO\}|\{combo\}/g, contact.combo || '');
 
+    // Dynamic replacement for any custom attributes from Excel
+    if (contact.customAttributes) {
+      Object.keys(contact.customAttributes).forEach(key => {
+        const val = contact.customAttributes![key];
+        if (val !== undefined && val !== null) {
+          const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\{${escapedKey}\\}`, 'gi');
+          text = text.replace(regex, String(val));
+        }
+      });
+    }
+
     // Spintax resolution {Hola|Buenos días|Estimado/a}
     text = text.replace(/\{([^{}]+)\}/g, (match, choicesStr) => {
       if (choicesStr.includes('|')) {

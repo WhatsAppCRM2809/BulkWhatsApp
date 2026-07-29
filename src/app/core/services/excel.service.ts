@@ -1,6 +1,15 @@
 import { Injectable, signal, computed } from '@angular/core';
 import * as XLSX from 'xlsx';
 
+export interface ContactPhoneItem {
+  id?: number;
+  phoneNumber: string;
+  phoneLabel: string;
+  hasWhatsApp: boolean;
+  isPrimary: boolean;
+  isValid: boolean;
+}
+
 export interface FinancialContact {
   id: string;
   ctaBt: string;
@@ -16,12 +25,14 @@ export interface FinancialContact {
   telefonoT2: string;
   telefonoValido: string;
   hasWhatsApp: boolean;
-  producto: string;
-  oferta: number;
-  tasa: number;
-  plazo: number;
-  agencia: string;
-  campana: string;
+  phones?: ContactPhoneItem[];
+  customAttributes?: Record<string, any>;
+  producto?: string;
+  oferta?: number;
+  tasa?: number;
+  plazo?: number;
+  agencia?: string;
+  campana?: string;
   propension?: string | number;
   edad?: number;
   combo?: string;
@@ -84,9 +95,14 @@ export class ExcelService {
     }
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
+      // Only serialize to localStorage if under 2000 items to avoid blocking UI thread on large Excels (66k+ rows)
+      if (contacts.length <= 2000) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
     } catch (e) {
-      console.warn('LocalStorage size limit exceeded:', e);
+      console.warn('LocalStorage limit reached or skipped for performance:', e);
     }
   }
 
@@ -189,6 +205,29 @@ export class ExcelService {
             const validPhone = this.normalizePhoneCascade(rawT1, rawT2, rawT3, rawT4);
             const hasWA = validPhone.length >= 9;
 
+            // Capture all dynamic headers into customAttributes
+            const customAttributes: Record<string, any> = {};
+            Object.keys(row).forEach(key => {
+              if (row[key] !== undefined && row[key] !== null) {
+                customAttributes[key.trim()] = row[key];
+              }
+            });
+
+            // Build normalized phone list according to Option B Best Practice
+            const phones: ContactPhoneItem[] = [];
+            if (validPhone) {
+              phones.push({ phoneNumber: validPhone, phoneLabel: 'PRIMARY', hasWhatsApp: hasWA, isPrimary: true, isValid: true });
+            }
+            if (rawT1 && rawT1 !== validPhone) {
+              phones.push({ phoneNumber: rawT1, phoneLabel: 'T1', hasWhatsApp: false, isPrimary: false, isValid: true });
+            }
+            if (rawT2 && rawT2 !== validPhone) {
+              phones.push({ phoneNumber: rawT2, phoneLabel: 'T2', hasWhatsApp: false, isPrimary: false, isValid: true });
+            }
+            if (rawT3 && rawT3 !== validPhone) {
+              phones.push({ phoneNumber: rawT3, phoneLabel: 'T3', hasWhatsApp: false, isPrimary: false, isValid: true });
+            }
+
             return {
               id: `CNT-${Date.now()}-${index}`,
               ctaBt: String(row['CTA BT'] || row['CtaBt'] || row['CUENTA'] || `AUT-${index}`),
@@ -204,6 +243,8 @@ export class ExcelService {
               telefonoT2: rawT2,
               telefonoValido: validPhone,
               hasWhatsApp: hasWA,
+              phones,
+              customAttributes,
               producto: String(row['PRODUCTO'] || row['Producto'] || 'Préstamo Personal'),
               oferta: Number(row['OFERTA'] || row['Oferta'] || row['MONTO'] || 15000),
               tasa: Number(row['TASA'] || row['Tasa'] || 39.5),
@@ -319,11 +360,15 @@ export class ExcelService {
    * Clears saved database reset to empty state
    */
   public clearDatabase(): void {
-    localStorage.removeItem(STORAGE_KEY);
     this.allContacts.set([]);
     this.validContacts.set([]);
     this.invalidContacts.set([]);
     this.selectedContact.set(null);
+    setTimeout(() => {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {}
+    }, 0);
   }
 
   /**

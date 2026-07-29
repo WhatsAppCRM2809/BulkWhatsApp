@@ -163,17 +163,17 @@ import { ModalService } from '../../core/services/modal.service';
         </div>
 
         <div class="pagination-buttons">
-          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Primera página">
+          <button class="btn btn-outline nav-page-btn" [disabled]="activePage() === 1" (click)="goToPage(1)" title="Primera página">
             &laquo;
           </button>
-          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Anterior">
+          <button class="btn btn-outline nav-page-btn" [disabled]="activePage() === 1" (click)="goToPage(activePage() - 1)" title="Anterior">
             &lt;
           </button>
-          <span class="page-indicator">Página {{ currentPage() }} de {{ totalPages() }}</span>
-          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Siguiente">
+          <span class="page-indicator">Página {{ activePage() }} de {{ totalPages() }}</span>
+          <button class="btn btn-outline nav-page-btn" [disabled]="activePage() === totalPages()" (click)="goToPage(activePage() + 1)" title="Siguiente">
             &gt;
           </button>
-          <button class="btn btn-outline nav-page-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Última página">
+          <button class="btn btn-outline nav-page-btn" [disabled]="activePage() === totalPages()" (click)="goToPage(totalPages())" title="Última página">
             &raquo;
           </button>
         </div>
@@ -668,7 +668,7 @@ export class ContactsTableComponent {
         c.ctaBt.toLowerCase().includes(q) ||
         c.telefonoT1.includes(q) ||
         c.telefonoValido.includes(q) ||
-        c.agencia.toLowerCase().includes(q) ||
+        (c.agencia && c.agencia.toLowerCase().includes(q)) ||
         (c.propension !== undefined && String(c.propension).toLowerCase().includes(q))
       );
     } else {
@@ -708,9 +708,17 @@ export class ContactsTableComponent {
     return Math.ceil(this.filteredContacts().length / this.pageSize()) || 1;
   });
 
+  public activePage = computed(() => {
+    const total = this.totalPages();
+    const current = this.currentPage();
+    if (current > total) return total;
+    if (current < 1) return 1;
+    return current;
+  });
+
   public paginatedContacts = computed(() => {
     const list = this.filteredContacts();
-    const page = this.currentPage();
+    const page = this.activePage();
     const size = this.pageSize();
     const start = (page - 1) * size;
     return list.slice(start, start + size);
@@ -728,13 +736,16 @@ export class ContactsTableComponent {
   }
 
   public getStartIndex(): number {
-    if (this.filteredContacts().length === 0) return 0;
-    return (this.currentPage() - 1) * this.pageSize() + 1;
+    const total = this.filteredContacts().length;
+    if (total === 0) return 0;
+    return (this.activePage() - 1) * this.pageSize() + 1;
   }
 
   public getEndIndex(): number {
-    const end = this.currentPage() * this.pageSize();
-    return end > this.filteredContacts().length ? this.filteredContacts().length : end;
+    const total = this.filteredContacts().length;
+    if (total === 0) return 0;
+    const end = this.activePage() * this.pageSize();
+    return end > total ? total : end;
   }
 
   public onExportContacts(): void {
@@ -749,7 +760,15 @@ export class ContactsTableComponent {
       return;
     }
     const tabName = this.activeTab() === 'valid' ? 'WhatsApp' : 'CallCenter';
-    this.excelService.exportContactsToExcel(list, `Reporte_Clientes_${tabName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    const fileName = `Reporte_Clientes_${tabName}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    this.excelService.exportContactsToExcel(list, fileName);
+
+    this.modalService.show({
+      title: '📥 Exportación Exitosa',
+      message: `Se ha generado y descargado el archivo "${fileName}" con ${list.length} registros en formato Excel.`,
+      type: 'success',
+      confirmText: 'Genial'
+    });
   }
 
   public openAddModal(): void {

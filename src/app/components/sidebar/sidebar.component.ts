@@ -65,7 +65,11 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
       width: 250px;
+      overflow-y: auto;
       background-color: var(--bg-sidebar);
       backdrop-filter: blur(16px);
       border-right: 1px solid var(--border-color);
@@ -74,6 +78,7 @@ import { AuthService } from '../../core/services/auth.service';
       justify-content: space-between;
       padding: 1.5rem 1rem;
       transition: all 0.2s ease;
+      z-index: 100;
     }
     @media (max-width: 992px) {
       .sidebar {
