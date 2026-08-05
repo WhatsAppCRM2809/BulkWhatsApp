@@ -102,7 +102,7 @@ export class AuthService {
   }
 
   addDaysToAgent(userId: number, days: number): Observable<AuthResponse> {
-    return this.http.put<AuthResponse>(`${this.apiUrl}/agents/${userId}/add-days?additionalDays=${days}`, {}, {
+    return this.http.put<AuthResponse>(`${this.apiUrl}/agents/${userId}/add-days?days=${days}&additionalDays=${days}`, {}, {
       headers: this.getAuthHeaders()
     });
   }
