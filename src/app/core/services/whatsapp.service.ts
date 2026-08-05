@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { FinancialContact } from './excel.service';
+import { FinancialContact, ExcelService } from './excel.service';
 import { AuthService } from './auth.service';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
@@ -14,6 +14,13 @@ export interface CampaignStats {
   interested: number;
   progressPercent: number;
   status: 'idle' | 'running' | 'paused' | 'completed';
+}
+
+export interface LogEvent {
+  ts: string;
+  level: 'info' | 'success' | 'warn' | 'error';
+  actor: string;
+  msg: string;
 }
 
 export interface WhatsAppInstanceResponse {
@@ -38,6 +45,15 @@ export class WhatsAppService {
   public connectedNumber = signal<string>('Sin Vincular');
   public riskLevel = signal<RiskLevel>('low');
 
+  public logs = signal<LogEvent[]>([
+    { ts: new Date().toLocaleTimeString('es-PE', { hour12: false }), level: 'info', actor: 'SYSTEM', msg: 'Sistema CRM inicializado y listo para envíos.' }
+  ]);
+
+  public addLog(level: 'info' | 'success' | 'warn' | 'error', actor: string, msg: string): void {
+    const ts = new Date().toLocaleTimeString('es-PE', { hour12: false });
+    this.logs.update(current => [{ ts, level, actor, msg }, ...current]);
+  }
+
   public messageTemplate = signal<string>(DEFAULT_BANK_TEMPLATE);
 
   public campaignStats = signal<CampaignStats>({
@@ -51,7 +67,8 @@ export class WhatsAppService {
 
   constructor(
     private http: HttpClient,
-    private authService: AuthService
+    private authService: AuthService,
+    private excelService: ExcelService
   ) {
     // Re-fetch template from PostgreSQL database whenever logged in user changes
     this.authService.currentUser$.subscribe(user => {
@@ -198,6 +215,8 @@ export class WhatsAppService {
     const templateText = this.messageTemplate();
     const delaySecs = this.getDelaySeconds();
 
+    this.addLog('info', 'CAMPAIGN', `Iniciando campaña masiva para ${contacts.length} contactos. Delay anti-baneo: ${delaySecs}s.`);
+
     this.campaignStats.set({
       total: contacts.length,
       sent: 0,
@@ -208,7 +227,10 @@ export class WhatsAppService {
     });
 
     for (let i = 0; i < contacts.length; i++) {
-      if (this.campaignStats().status !== 'running') break;
+      if (this.campaignStats().status !== 'running') {
+        this.addLog('warn', 'CAMPAIGN', 'Campaña detenída o pausada por el usuario.');
+        break;
+      }
 
       const contact = contacts[i];
       const message = this.replaceVariables(templateText, contact);
@@ -217,14 +239,20 @@ export class WhatsAppService {
         const res = await this.sendTextMessage(contact.telefonoValido, message).toPromise();
         if (res?.success) {
           contact.estado = 'Enviado';
+          this.excelService.updateContactStatus(contact.id, 'Enviado');
           this.campaignStats.update(s => ({ ...s, sent: s.sent + 1 }));
+          this.addLog('success', 'SENDER', `Mensaje entregado ➔ ${contact.nombreCompleto} (${contact.telefonoValido})`);
         } else {
           contact.estado = 'Fallido';
+          this.excelService.updateContactStatus(contact.id, 'Fallido');
           this.campaignStats.update(s => ({ ...s, failed: s.failed + 1 }));
+          this.addLog('error', 'SENDER', `Error de envío ➔ ${contact.nombreCompleto} (${contact.telefonoValido})`);
         }
       } catch (err) {
         contact.estado = 'Fallido';
+        this.excelService.updateContactStatus(contact.id, 'Fallido');
         this.campaignStats.update(s => ({ ...s, failed: s.failed + 1 }));
+        this.addLog('error', 'SENDER', `Fallo de envío o timeout ➔ ${contact.nombreCompleto} (${contact.telefonoValido})`);
       }
 
       const progress = Math.round(((i + 1) / contacts.length) * 100);
@@ -232,12 +260,14 @@ export class WhatsAppService {
 
       // Wait anti-ban delay before next message
       if (i < contacts.length - 1 && this.campaignStats().status === 'running') {
+        this.addLog('info', 'ANTI-BAN', `Espera inteligente de ${delaySecs}s antes del siguiente cliente...`);
         await new Promise(resolve => setTimeout(resolve, delaySecs * 1000));
       }
     }
 
     if (this.campaignStats().status === 'running') {
       this.campaignStats.update(s => ({ ...s, status: 'completed', progressPercent: 100 }));
+      this.addLog('success', 'CAMPAIGN', `Campaña masiva finalizada. Se procesaron ${contacts.length} registros.`);
     }
   }
 

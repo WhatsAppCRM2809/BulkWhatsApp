@@ -144,6 +144,7 @@ export class KpiCardsComponent {
 
   public exportCallList(): void {
     const data = this.excelService.invalidContacts();
-    alert(`Descargando Excel para Call Center con ${data.length} contactos sin WhatsApp.`);
+    if (data.length === 0) return;
+    this.excelService.exportContactsToExcel(data, 'Lista_CallCenter_Sin_WhatsApp.xlsx');
   }
 }

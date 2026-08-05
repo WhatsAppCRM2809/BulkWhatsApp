@@ -20,6 +20,7 @@ export class UsersComponent implements OnInit {
   showEditModal = false;
   message = '';
   isSuccess = false;
+  customDaysInput: { [userId: number]: number } = {};
 
   newUser: RegisterRequest = {
     username: '',
@@ -223,12 +224,30 @@ export class UsersComponent implements OnInit {
     });
   }
 
+  getCustomDays(userId: number): number {
+    if (this.customDaysInput[userId] === undefined || this.customDaysInput[userId] === null) {
+      return 30;
+    }
+    return this.customDaysInput[userId];
+  }
+
   onAddDays(userId: number, days: number): void {
-    this.authService.addDaysToAgent(userId, days).subscribe({
+    const daysAmount = Number(days);
+    if (!daysAmount || daysAmount <= 0) {
+      this.modalService.show({
+        title: '⚠️ Cantidad Inválida',
+        message: 'Por favor ingresa una cantidad de días mayor a 0.',
+        type: 'warning',
+        confirmText: 'Entendido'
+      });
+      return;
+    }
+
+    this.authService.addDaysToAgent(userId, daysAmount).subscribe({
       next: (updatedAgent) => {
         this.modalService.show({
           title: '✅ Licencia Extendida',
-          message: `Se añadieron +${days} días exitosamente al usuario '${updatedAgent.username}'.`,
+          message: `Se añadieron +${daysAmount} días exitosamente al usuario '${updatedAgent.username}'.`,
           type: 'success',
           confirmText: 'Aceptar'
         });
@@ -238,7 +257,7 @@ export class UsersComponent implements OnInit {
         if (err.status !== 401) {
           this.modalService.show({
             title: '❌ Error al Extender Licencia',
-            message: 'Ocurrió un error al extender los días del usuario.',
+            message: err.error?.message || 'Ocurrió un error al extender los días del usuario.',
             type: 'error',
             confirmText: 'Cerrar'
           });

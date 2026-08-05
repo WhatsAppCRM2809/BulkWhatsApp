@@ -54,6 +54,23 @@ export class AuthService {
     );
   }
 
+  getProfile(username?: string): Observable<AuthResponse> {
+    const targetUsername = username || this.currentUserValue?.username;
+    if (!targetUsername) return new Observable();
+    return this.http.get<AuthResponse>(`${this.apiUrl}/profile/${targetUsername}`, {
+      headers: this.getAuthHeaders()
+    }).pipe(
+      tap(updatedUser => {
+        if (updatedUser) {
+          const current = this.currentUserValue;
+          const merged = { ...current, ...updatedUser };
+          localStorage.setItem('user', JSON.stringify(merged));
+          this.currentUserSubject.next(merged);
+        }
+      })
+    );
+  }
+
   registerAgent(data: RegisterRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data, {
       headers: this.getAuthHeaders()

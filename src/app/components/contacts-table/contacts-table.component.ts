@@ -1,7 +1,7 @@
 import { Component, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ExcelService, FinancialContact } from '../../core/services/excel.service';
+import { ExcelService, FinancialContact, ContactStatus } from '../../core/services/excel.service';
 import { ModalService } from '../../core/services/modal.service';
 
 @Component({
@@ -10,21 +10,48 @@ import { ModalService } from '../../core/services/modal.service';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="card table-card">
-      <!-- Tabs, Actions & Search Header -->
+      <!-- Status Filter Tabs & Action Bar -->
       <div class="table-header">
         <div class="header-left">
+          <!-- Status Filter Tabs -->
           <div class="tab-buttons">
-            <button class="tab-btn" [class.active]="activeTab() === 'valid'" (click)="activeTab.set('valid')">
-              <span class="status-dot dot-valid"></span>
-              <span>Listos para WhatsApp ({{ excelService.validContacts().length }})</span>
+            <button class="tab-btn" [class.active]="activeTab() === 'all'" (click)="setTab('all')">
+              <span class="status-dot dot-all"></span>
+              <span>Todos ({{ excelService.totalRecords() }})</span>
             </button>
-            <button class="tab-btn" [class.active]="activeTab() === 'invalid'" (click)="activeTab.set('invalid')">
+            <button class="tab-btn" [class.active]="activeTab() === 'no_atendido'" (click)="setTab('no_atendido')">
+              <span class="status-dot dot-pending"></span>
+              <span>No Atendidos ({{ countByStatus('No atendido') }})</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab() === 'enviado'" (click)="setTab('enviado')">
+              <span class="status-dot dot-sent"></span>
+              <span>Enviados ({{ countByStatus('Enviado') }})</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab() === 'atendido'" (click)="setTab('atendido')">
+              <span class="status-dot dot-attended"></span>
+              <span>Atendidos ({{ countByStatus('Atendido') }})</span>
+            </button>
+            <button class="tab-btn" [class.active]="activeTab() === 'invalid'" (click)="setTab('invalid')">
               <span class="status-dot dot-invalid"></span>
-              <span>Seguimiento Call Center ({{ excelService.invalidContacts().length }})</span>
+              <span>Call Center ({{ excelService.invalidContacts().length }})</span>
             </button>
           </div>
 
+          <!-- Quick Actions Bar -->
           <div class="action-buttons">
+            <button class="btn btn-select-all" (click)="toggleSelectAllVisible()">
+              <input type="checkbox" [checked]="isAllVisibleSelected()" (click)="$event.stopPropagation(); toggleSelectAllVisible()" />
+              <span>{{ isAllVisibleSelected() ? 'Deseleccionar Todos' : 'Seleccionar Todos (' + filteredContacts().length + ')' }}</span>
+            </button>
+
+            <button class="btn btn-danger-outline" *ngIf="selectedIds().size > 0" (click)="confirmDeleteSelected()">
+              <svg class="trash-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Eliminar Seleccionados ({{ selectedIds().size }})</span>
+            </button>
+
             <button class="btn btn-add-manual" (click)="openAddModal()">
               <svg class="add-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -43,15 +70,16 @@ import { ModalService } from '../../core/services/modal.service';
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-              <span>Limpiar Tabla</span>
+              <span>Limpiar Todo</span>
             </button>
           </div>
         </div>
 
+        <!-- Search Box -->
         <div class="search-box">
           <div class="search-input-wrapper">
             <svg class="search-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" class="form-control search-input" placeholder="Buscar cliente, DNI, CTA, agencia..." [ngModel]="searchQuery()" (ngModelChange)="onSearchChange($event)" />
+            <input type="text" class="form-control search-input" placeholder="Buscar cliente, DNI, teléfono..." [ngModel]="searchQuery()" (ngModelChange)="onSearchChange($event)" />
           </div>
         </div>
       </div>
@@ -61,6 +89,9 @@ import { ModalService } from '../../core/services/modal.service';
         <table class="data-table">
           <thead>
             <tr>
+              <th class="checkbox-th">
+                <input type="checkbox" [checked]="isAllVisibleSelected()" (change)="toggleSelectAllVisible()" title="Seleccionar/Deseleccionar todos los visibles" />
+              </th>
               <th (click)="toggleSort('doc')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'doc'">
                 DOC / DNI
                 <span class="sort-icon" *ngIf="sortColumn() === 'doc'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
@@ -71,73 +102,131 @@ import { ModalService } from '../../core/services/modal.service';
                 <span class="sort-icon" *ngIf="sortColumn() === 'nombreCompleto'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
               </th>
               <th>Teléfono Envío</th>
-              <th (click)="toggleSort('propension')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'propension'" title="Clic para ordenar por Propensión Alta/Baja">
+              <th (click)="toggleSort('propension')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'propension'">
                 Propensión
-                <span class="sort-icon" *ngIf="sortColumn() === 'propension'">{{ sortDirection() === 'desc' ? '▼ (Mayor a Menor)' : '▲ (Menor a Mayor)' }}</span>
+                <span class="sort-icon" *ngIf="sortColumn() === 'propension'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
               </th>
-              <th>Producto</th>
               <th (click)="toggleSort('oferta')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'oferta'">
                 Oferta (S/)
                 <span class="sort-icon" *ngIf="sortColumn() === 'oferta'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
               </th>
-              <th (click)="toggleSort('tasa')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'tasa'">
-                Tasa (%)
-                <span class="sort-icon" *ngIf="sortColumn() === 'tasa'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
-              </th>
-              <th>Plazo</th>
               <th>Agencia</th>
-              <th>Estado</th>
+              <th (click)="toggleSort('estado')" class="sortable-header" [class.active-sort-th]="sortColumn() === 'estado'">
+                Estado de Seguimiento
+                <span class="sort-icon" *ngIf="sortColumn() === 'estado'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
+              <th class="actions-th">Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let contact of paginatedContacts()" 
-                [class.selected-row]="excelService.selectedContact()?.id === contact.id"
-                (click)="excelService.selectedContact.set(contact)"
+                [class.selected-row]="selectedIds().has(contact.id)"
                 class="clickable-row">
-              <td><span class="doc-code">{{ contact.doc || '-' }}</span></td>
+              <td class="checkbox-td" (click)="$event.stopPropagation()">
+                <input type="checkbox" [checked]="selectedIds().has(contact.id)" (change)="toggleSelectContact(contact.id)" />
+              </td>
+
+              <td>
+                <span class="doc-code" *ngIf="editingRowId !== contact.id">{{ contact.doc || '-' }}</span>
+                <input *ngIf="editingRowId === contact.id" 
+                       type="text" 
+                       class="form-control form-control-sm inline-input-doc" 
+                       [(ngModel)]="editForm.doc" 
+                       (keyup.enter)="saveInlineEdit(contact.id)"
+                       placeholder="DNI / DOC" />
+              </td>
               <td><code class="cta-code">{{ contact.ctaBt }}</code></td>
+              
+              <!-- Editable Name -->
               <td>
                 <div class="name-cell">
-                  <span class="full-name">{{ contact.nombreCompleto }}</span>
-                  <small class="name-tags">Primer: {{ contact.primerNombre }} | Pat: {{ contact.apellidoPaterno }}</small>
+                  <span class="full-name" *ngIf="editingRowId !== contact.id">{{ contact.nombreCompleto }}</span>
+                  <input *ngIf="editingRowId === contact.id" 
+                         type="text" 
+                         class="form-control form-control-sm" 
+                         [(ngModel)]="editForm.nombreCompleto" 
+                         (keyup.enter)="saveInlineEdit(contact.id)" />
+                  <small class="name-tags" *ngIf="editingRowId !== contact.id">Primer: {{ contact.primerNombre }} | Pat: {{ contact.apellidoPaterno }}</small>
                 </div>
               </td>
-              <td>
-                <span class="phone-tag" *ngIf="contact.telefonoValido">
-                  +{{ contact.telefonoValido }}
-                </span>
-                <span class="phone-tag phone-invalid" *ngIf="!contact.telefonoValido">
-                  Sin Celular
-                </span>
+
+              <!-- Multi-Phone Selector -->
+              <td (click)="$event.stopPropagation()">
+                <div class="phone-selector-wrapper">
+                  <!-- Single phone view or multi phone selector -->
+                  <select *ngIf="getPhoneOptions(contact).length > 1" 
+                          class="form-control form-control-sm phone-select"
+                          [ngModel]="contact.telefonoValido"
+                          (ngModelChange)="onPhoneSelected(contact, $event)">
+                    <option *ngFor="let p of getPhoneOptions(contact)" [value]="p.value">
+                      {{ p.label }} (+{{ p.value }})
+                    </option>
+                  </select>
+
+                  <span class="phone-tag" *ngIf="getPhoneOptions(contact).length <= 1 && contact.telefonoValido">
+                    +{{ contact.telefonoValido }}
+                  </span>
+                  <span class="phone-tag phone-invalid" *ngIf="getPhoneOptions(contact).length === 0 && !contact.telefonoValido">
+                    Sin Celular
+                  </span>
+                </div>
               </td>
+
               <td>
                 <span class="badge badge-propension" *ngIf="contact.propension !== undefined && contact.propension !== ''">
                   {{ contact.propension }}
                 </span>
                 <span class="text-muted" *ngIf="contact.propension === undefined || contact.propension === ''">-</span>
               </td>
-              <td><span class="badge badge-warning">{{ contact.producto }}</span></td>
-              <td class="amount-cell">S/ {{ contact.oferta | number:'1.2-2' }}</td>
-              <td class="rate-cell">{{ contact.tasa }}%</td>
-              <td>{{ contact.plazo }}m</td>
-              <td>{{ contact.agencia }}</td>
-              <td>
-                <span class="badge" 
-                      [class.badge-secondary]="contact.estado === 'Pendiente'"
-                      [class.badge-success]="contact.estado === 'Enviado' || contact.estado === 'Interesado'"
-                      [class.badge-danger]="contact.estado === 'Fallido' || contact.estado === 'Sin Telefono'">
+
+              <td class="amount-cell">
+                <span *ngIf="editingRowId !== contact.id">S/ {{ contact.oferta | number:'1.2-2' }}</span>
+                <input *ngIf="editingRowId === contact.id" 
+                       type="number" 
+                       class="form-control form-control-sm inline-input" 
+                       [(ngModel)]="editForm.oferta" 
+                       (keyup.enter)="saveInlineEdit(contact.id)" />
+              </td>
+
+              <td>{{ contact.agencia || 'Agencia Principal' }}</td>
+
+              <!-- Interactive 1-Click Status Toggle Button -->
+              <td (click)="$event.stopPropagation()">
+                <button class="status-toggle-badge"
+                        [class.badge-no-atendido]="contact.estado === 'No atendido' || contact.estado === 'Pendiente'"
+                        [class.badge-atendido]="contact.estado === 'Atendido'"
+                        [class.badge-enviado]="contact.estado === 'Enviado'"
+                        [class.badge-fallido]="contact.estado === 'Fallido' || contact.estado === 'Sin Telefono'"
+                        (click)="toggleStatus(contact)"
+                        title="Haz clic para alternar entre 'No atendido' y 'Atendido'">
                   {{ contact.estado }}
-                </span>
+                </button>
+              </td>
+
+              <!-- Row Action Buttons -->
+              <td class="actions-td" (click)="$event.stopPropagation()">
+                <button class="row-action-btn edit-btn" *ngIf="editingRowId !== contact.id" (click)="startInlineEdit(contact)" title="Editar datos">
+                  <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button class="row-action-btn save-btn" *ngIf="editingRowId === contact.id" (click)="saveInlineEdit(contact.id)" title="Guardar">
+                  <svg class="action-icon icon-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button class="row-action-btn cancel-btn" *ngIf="editingRowId === contact.id" (click)="cancelInlineEdit()" title="Cancelar">
+                  <svg class="action-icon icon-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <button class="row-action-btn delete-btn" (click)="confirmDeleteContact(contact)" title="Eliminar fila">
+                  <svg class="action-icon icon-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
               </td>
             </tr>
 
             <!-- Empty State -->
             <tr *ngIf="filteredContacts().length === 0">
-              <td colspan="11" class="empty-state-cell">
+              <td colspan="10" class="empty-state-cell">
                 <div class="empty-state">
                   <svg class="empty-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                   <p class="empty-title" *ngIf="searchQuery().trim().length > 0">No se encontraron clientes para "{{ searchQuery() }}"</p>
-                  <p class="empty-title" *ngIf="searchQuery().trim().length === 0">No hay contactos cargados en la base de datos</p>
+                  <p class="empty-title" *ngIf="searchQuery().trim().length === 0">No hay contactos en esta categoría</p>
                   <p class="empty-sub">Importa una base de datos Excel (.xlsx, .csv) o haz clic en "Agregar Cliente".</p>
                 </div>
               </td>
@@ -202,12 +291,23 @@ import { ModalService } from '../../core/services/modal.service';
 
           <div class="form-row">
             <div class="form-group col">
+              <label>DNI / Documento Identidad</label>
+              <input type="text" class="form-control" [(ngModel)]="newContactForm.doc" placeholder="Ej: 74819203" />
+            </div>
+            <div class="form-group col">
               <label>Cuenta / Código CTA BT</label>
               <input type="text" class="form-control" [(ngModel)]="newContactForm.ctaBt" placeholder="Ej: 88492019" />
             </div>
+          </div>
+
+          <div class="form-row">
             <div class="form-group col">
               <label>Producto Financiero</label>
               <input type="text" class="form-control" [(ngModel)]="newContactForm.producto" placeholder="Ej: Préstamo Personal" />
+            </div>
+            <div class="form-group col">
+              <label>Agencia Asignada</label>
+              <input type="text" class="form-control" [(ngModel)]="newContactForm.agencia" placeholder="Ej: Agencia San Isidro" />
             </div>
           </div>
 
@@ -226,10 +326,7 @@ import { ModalService } from '../../core/services/modal.service';
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Agencia Asignada</label>
-            <input type="text" class="form-control" [(ngModel)]="newContactForm.agencia" placeholder="Ej: Agencia San Isidro" />
-          </div>
+
         </div>
 
         <div class="modal-footer">
@@ -256,7 +353,7 @@ import { ModalService } from '../../core/services/modal.service';
     .header-left {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
+      gap: 1.25rem;
       flex-wrap: wrap;
     }
     .tab-buttons {
@@ -265,16 +362,17 @@ import { ModalService } from '../../core/services/modal.service';
       padding: 0.25rem;
       border-radius: var(--radius-md);
       gap: 0.25rem;
+      flex-wrap: wrap;
     }
     .tab-btn {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.85rem;
+      gap: 0.4rem;
+      padding: 0.45rem 0.75rem;
       border: none;
       background: none;
       color: var(--text-muted);
-      font-size: 0.8rem;
+      font-size: 0.775rem;
       font-weight: 600;
       border-radius: var(--radius-sm);
       cursor: pointer;
@@ -290,13 +388,30 @@ import { ModalService } from '../../core/services/modal.service';
       height: 8px;
       border-radius: 50%;
     }
-    .dot-valid { background-color: var(--accent-cyan); }
-    .dot-invalid { background-color: #f59e0b; }
+    .dot-all { background-color: var(--accent-cyan); }
+    .dot-pending { background-color: #f59e0b; }
+    .dot-sent { background-color: #10b981; }
+    .dot-attended { background-color: #3b82f6; }
+    .dot-invalid { background-color: #ef4444; }
     
     .action-buttons {
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .btn-select-all {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 0.45rem 0.75rem;
+      font-size: 0.775rem;
+      border-radius: var(--radius-md);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 600;
+      cursor: pointer;
     }
     .btn-add-manual {
       background-color: #0284c7;
@@ -345,7 +460,7 @@ import { ModalService } from '../../core/services/modal.service';
     }
     .search-box {
       flex: 1;
-      max-width: 320px;
+      max-width: 300px;
     }
     .search-input-wrapper {
       position: relative;
@@ -373,9 +488,13 @@ import { ModalService } from '../../core/services/modal.service';
       color: var(--text-secondary);
       font-weight: 700;
       text-align: left;
-      padding: 0.75rem 1rem;
+      padding: 0.75rem 0.85rem;
       border-bottom: 1px solid var(--border-color);
       white-space: nowrap;
+    }
+    .checkbox-th, .checkbox-td {
+      width: 36px;
+      text-align: center !important;
     }
     .sortable-header {
       cursor: pointer;
@@ -395,20 +514,19 @@ import { ModalService } from '../../core/services/modal.service';
       margin-left: 0.25rem;
     }
     .data-table td {
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 0.85rem;
       border-bottom: 1px solid var(--border-color);
       color: var(--text-secondary);
       white-space: nowrap;
     }
     .clickable-row {
-      cursor: pointer;
       transition: var(--transition);
     }
     .clickable-row:hover {
       background-color: var(--bg-hover);
     }
     .selected-row {
-      background-color: var(--accent-cyan-light) !important;
+      background-color: rgba(6, 182, 212, 0.08) !important;
     }
     .cta-code {
       font-family: monospace;
@@ -441,43 +559,113 @@ import { ModalService } from '../../core/services/modal.service';
       font-size: 0.7rem;
       color: var(--text-muted);
     }
+    .phone-selector-wrapper {
+      display: flex;
+      align-items: center;
+    }
+    .phone-select {
+      font-family: monospace;
+      font-size: 0.775rem;
+      font-weight: 600;
+      padding: 0.2rem 0.4rem;
+      max-width: 140px;
+    }
     .phone-tag {
       font-family: monospace;
       font-weight: 600;
       color: var(--accent-cyan);
     }
     .phone-invalid {
-      color: #f59e0b;
+      color: #ef4444;
     }
     .amount-cell {
       font-weight: 700;
       color: var(--text-primary);
     }
-    .rate-cell {
-      color: var(--accent-cyan);
-      font-weight: 600;
+    .inline-input {
+      max-width: 90px;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.8rem;
     }
-    .badge {
-      padding: 0.25rem 0.5rem;
-      border-radius: var(--radius-full);
-      font-size: 0.7rem;
-      font-weight: 600;
+    .inline-input-doc {
+      max-width: 100px;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.8rem;
+      font-family: monospace;
     }
-    .badge-warning {
+    
+    /* Status Toggle Badge Button (1-Click Fixed Width Capsule) */
+    .status-toggle-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.35rem 0.5rem;
+      border-radius: 20px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      width: 110px;
+      min-width: 110px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .status-toggle-badge:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .badge-no-atendido {
       background-color: rgba(245, 158, 11, 0.15);
       color: #f59e0b;
+      border-color: rgba(245, 158, 11, 0.4);
     }
-    .badge-secondary {
+    .badge-atendido {
+      background-color: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    .badge-enviado {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+    .badge-fallido {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .action-icon {
+      width: 15px;
+      height: 15px;
+      color: var(--text-secondary);
+      vertical-align: middle;
+    }
+    .icon-success {
+      color: #10b981;
+    }
+    .icon-danger {
+      color: #ef4444;
+    }
+
+    .actions-th, .actions-td {
+      text-align: center !important;
+      width: 90px;
+    }
+    .row-action-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 0.2rem 0.35rem;
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+    }
+    .row-action-btn:hover {
       background-color: var(--bg-tertiary);
-      color: var(--text-muted);
-    }
-    .badge-success {
-      background-color: var(--status-success-bg);
-      color: var(--status-success-text);
-    }
-    .badge-danger {
-      background-color: var(--status-error-bg);
-      color: var(--status-error-text);
     }
     .empty-state-cell {
       padding: 3rem 1rem !important;
@@ -612,17 +800,31 @@ import { ModalService } from '../../core/services/modal.service';
   `]
 })
 export class ContactsTableComponent {
-  public activeTab = signal<'valid' | 'invalid'>('valid');
+  public activeTab = signal<'all' | 'no_atendido' | 'enviado' | 'atendido' | 'invalid'>('all');
   public searchQuery = signal<string>('');
 
   public pageSize = signal<number>(50);
   public currentPage = signal<number>(1);
 
-  public sortColumn = signal<'propension' | 'oferta' | 'nombreCompleto' | 'doc' | 'tasa' | 'none'>('propension');
+  public sortColumn = signal<'propension' | 'oferta' | 'nombreCompleto' | 'doc' | 'estado' | 'none'>('propension');
   public sortDirection = signal<'asc' | 'desc'>('desc');
+
+  // Batch Selection State (Shared with ExcelService)
+  public get selectedIds() {
+    return this.excelService.selectedIds;
+  }
+
+  // Inline Row Editing State
+  public editingRowId: string | null = null;
+  public editForm = {
+    doc: '',
+    nombreCompleto: '',
+    oferta: 0
+  };
 
   public showAddModal = false;
   public newContactForm = {
+    doc: '',
     nombre: '',
     telefono: '',
     ctaBt: '',
@@ -638,12 +840,21 @@ export class ContactsTableComponent {
     private modalService: ModalService
   ) {}
 
+  public setTab(tab: 'all' | 'no_atendido' | 'enviado' | 'atendido' | 'invalid'): void {
+    this.activeTab.set(tab);
+    this.currentPage.set(1);
+  }
+
+  public countByStatus(status: ContactStatus): number {
+    return this.excelService.allContacts().filter(c => c.estado === status).length;
+  }
+
   public onSearchChange(query: string): void {
     this.searchQuery.set(query || '');
     this.currentPage.set(1);
   }
 
-  public toggleSort(col: 'propension' | 'oferta' | 'nombreCompleto' | 'doc' | 'tasa'): void {
+  public toggleSort(col: 'propension' | 'oferta' | 'nombreCompleto' | 'doc' | 'estado'): void {
     if (this.sortColumn() === col) {
       this.sortDirection.set(this.sortDirection() === 'desc' ? 'asc' : 'desc');
     } else {
@@ -654,9 +865,21 @@ export class ContactsTableComponent {
   }
 
   public filteredContacts = computed(() => {
-    const rawList = this.activeTab() === 'valid' 
-      ? this.excelService.validContacts() 
-      : this.excelService.invalidContacts();
+    const all = this.excelService.allContacts();
+    const tab = this.activeTab();
+
+    let rawList: FinancialContact[] = [];
+    if (tab === 'all') {
+      rawList = all;
+    } else if (tab === 'no_atendido') {
+      rawList = all.filter(c => c.estado === 'No atendido' || c.estado === 'Pendiente');
+    } else if (tab === 'enviado') {
+      rawList = all.filter(c => c.estado === 'Enviado');
+    } else if (tab === 'atendido') {
+      rawList = all.filter(c => c.estado === 'Atendido');
+    } else if (tab === 'invalid') {
+      rawList = all.filter(c => !c.hasWhatsApp || c.estado === 'Sin Telefono');
+    }
 
     let list = rawList;
     const q = this.searchQuery().toLowerCase().trim();
@@ -688,14 +911,14 @@ export class ContactsTableComponent {
         if (col === 'oferta') {
           return ((a.oferta || 0) - (b.oferta || 0)) * dir;
         }
-        if (col === 'tasa') {
-          return ((a.tasa || 0) - (b.tasa || 0)) * dir;
-        }
         if (col === 'nombreCompleto') {
           return a.nombreCompleto.localeCompare(b.nombreCompleto) * dir;
         }
         if (col === 'doc') {
           return (a.doc || '').localeCompare(b.doc || '') * dir;
+        }
+        if (col === 'estado') {
+          return (a.estado || '').localeCompare(b.estado || '') * dir;
         }
         return 0;
       });
@@ -723,6 +946,154 @@ export class ContactsTableComponent {
     const start = (page - 1) * size;
     return list.slice(start, start + size);
   });
+
+  // Batch Selection Methods
+  public toggleSelectContact(id: string): void {
+    const currentSet = new Set(this.selectedIds());
+    if (currentSet.has(id)) {
+      currentSet.delete(id);
+    } else {
+      currentSet.add(id);
+    }
+    this.selectedIds.set(currentSet);
+  }
+
+  public isAllVisibleSelected(): boolean {
+    const visible = this.filteredContacts();
+    if (visible.length === 0) return false;
+    const currentSet = this.selectedIds();
+    return visible.every(c => currentSet.has(c.id));
+  }
+
+  public toggleSelectAllVisible(): void {
+    const visible = this.filteredContacts();
+    const currentSet = new Set(this.selectedIds());
+
+    if (this.isAllVisibleSelected()) {
+      visible.forEach(c => currentSet.delete(c.id));
+    } else {
+      visible.forEach(c => currentSet.add(c.id));
+    }
+
+    this.selectedIds.set(currentSet);
+  }
+
+  public confirmDeleteSelected(): void {
+    const count = this.selectedIds().size;
+    if (count === 0) return;
+
+    this.modalService.show({
+      title: `⚠️ ¿Eliminar ${count} contactos seleccionados?`,
+      message: `Esta acción eliminará permanentemente ${count} registros de la tabla. ¿Deseas continuar?`,
+      type: 'warning',
+      showCancel: true,
+      cancelText: 'No, cancelar',
+      confirmText: `Sí, eliminar (${count})`,
+      onConfirm: () => {
+        const idsArray = Array.from(this.selectedIds());
+        this.excelService.deleteContactsBatch(idsArray);
+        this.selectedIds.set(new Set());
+        this.modalService.show({
+          title: '🗑️ Eliminación Completada',
+          message: `Se han eliminado los ${count} contactos seleccionados.`,
+          type: 'success',
+          confirmText: 'Aceptar'
+        });
+      }
+    });
+  }
+
+  // Single Row Editing & Deleting
+  public startInlineEdit(contact: FinancialContact): void {
+    this.editingRowId = contact.id;
+    this.editForm = {
+      doc: contact.doc || '',
+      nombreCompleto: contact.nombreCompleto,
+      oferta: contact.oferta || 0
+    };
+  }
+
+  public saveInlineEdit(contactId: string): void {
+    if (this.editForm.nombreCompleto.trim().length > 0) {
+      this.excelService.updateContactField(contactId, {
+        doc: this.editForm.doc.trim(),
+        nombreCompleto: this.editForm.nombreCompleto.trim(),
+        oferta: Number(this.editForm.oferta) || 0
+      });
+    }
+    this.editingRowId = null;
+  }
+
+  public cancelInlineEdit(): void {
+    this.editingRowId = null;
+  }
+
+  public confirmDeleteContact(contact: FinancialContact): void {
+    this.modalService.show({
+      title: '🗑️ ¿Eliminar este cliente?',
+      message: `¿Estás seguro de eliminar a "${contact.nombreCompleto}" (${contact.doc || contact.ctaBt}) de la lista?`,
+      type: 'warning',
+      showCancel: true,
+      cancelText: 'Cancelar',
+      confirmText: 'Sí, eliminar',
+      onConfirm: () => {
+        this.excelService.deleteContact(contact.id);
+      }
+    });
+  }
+
+  public toggleStatus(contact: FinancialContact): void {
+    const nextStatus: ContactStatus = contact.estado === 'Atendido' ? 'No atendido' : 'Atendido';
+    this.excelService.updateContactStatus(contact.id, nextStatus);
+  }
+
+  public onStatusChange(contact: FinancialContact, newStatus: any): void {
+    this.excelService.updateContactStatus(contact.id, newStatus as ContactStatus);
+  }
+
+  public onPhoneSelected(contact: FinancialContact, selectedPhone: any): void {
+    this.excelService.updateContactPhone(contact.id, String(selectedPhone));
+  }
+
+  public getPhoneOptions(contact: FinancialContact): { label: string; value: string }[] {
+    const options: { label: string; value: string }[] = [];
+    const seen = new Set<string>();
+
+    const cleanT1 = contact.telefonoT1 ? contact.telefonoT1.replace(/\D/g, '') : '';
+    if (cleanT1 && cleanT1.length >= 7) {
+      const val = cleanT1.length === 9 ? `51${cleanT1}` : cleanT1;
+      options.push({ label: 'Teléfono 1 (T1)', value: val });
+      seen.add(val);
+    }
+
+    const cleanT2 = contact.telefonoT2 ? contact.telefonoT2.replace(/\D/g, '') : '';
+    if (cleanT2 && cleanT2.length >= 7) {
+      const val = cleanT2.length === 9 ? `51${cleanT2}` : cleanT2;
+      if (!seen.has(val)) {
+        options.push({ label: 'Teléfono 2 (T2)', value: val });
+        seen.add(val);
+      }
+    }
+
+    if (contact.phones && contact.phones.length > 0) {
+      contact.phones.forEach(p => {
+        const clean = p.phoneNumber.replace(/\D/g, '');
+        if (clean && clean.length >= 7) {
+          const val = clean.length === 9 ? `51${clean}` : clean;
+          if (!seen.has(val)) {
+            options.push({ label: p.phoneLabel || 'Secundario', value: val });
+            seen.add(val);
+          }
+        }
+      });
+    }
+
+    if (options.length === 0 && contact.telefonoValido) {
+      options.push({ label: 'Principal', value: contact.telefonoValido });
+    }
+
+    return options;
+  }
 
   public onPageSizeChange(newSize: any): void {
     this.pageSize.set(Number(newSize));
@@ -759,13 +1130,13 @@ export class ContactsTableComponent {
       });
       return;
     }
-    const tabName = this.activeTab() === 'valid' ? 'WhatsApp' : 'CallCenter';
+    const tabName = this.activeTab().toUpperCase();
     const fileName = `Reporte_Clientes_${tabName}_${new Date().toISOString().slice(0,10)}.xlsx`;
     this.excelService.exportContactsToExcel(list, fileName);
 
     this.modalService.show({
       title: '📥 Exportación Exitosa',
-      message: `Se ha generado y descargado el archivo "${fileName}" con ${list.length} registros en formato Excel.`,
+      message: `Se ha generado el archivo "${fileName}" con ${list.length} registros en formato Excel, incluyendo la columna de Estado de Seguimiento.`,
       type: 'success',
       confirmText: 'Genial'
     });
@@ -773,6 +1144,7 @@ export class ContactsTableComponent {
 
   public openAddModal(): void {
     this.newContactForm = {
+      doc: '',
       nombre: '',
       telefono: '',
       ctaBt: '',
@@ -804,7 +1176,7 @@ export class ContactsTableComponent {
     this.closeAddModal();
 
     if (created.hasWhatsApp) {
-      this.activeTab.set('valid');
+      this.activeTab.set('no_atendido');
       this.modalService.show({
         title: '✅ Cliente Registrado',
         message: `El cliente "${created.nombreCompleto}" con número +${created.telefonoValido} fue agregado exitosamente y listo para el recorrido de WhatsApp.`,
@@ -839,9 +1211,10 @@ export class ContactsTableComponent {
       type: 'warning',
       showCancel: true,
       cancelText: 'No, cancelar',
-      confirmText: 'Sí, limpiar tabla',
+      confirmText: 'Sí, limpiar todo',
       onConfirm: () => {
         this.excelService.clearDatabase();
+        this.selectedIds.set(new Set());
         this.modalService.show({
           title: '🗑️ Tabla Limpiada',
           message: 'Se han eliminado correctamente todos los clientes de la tabla.',

@@ -1,12 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
-interface LogEvent {
-  ts: string;
-  level: 'info' | 'success' | 'warn' | 'error';
-  actor: string;
-  msg: string;
-}
+import { WhatsAppService, LogEvent } from '../../core/services/whatsapp.service';
 
 @Component({
   selector: 'app-logs',
@@ -19,7 +13,7 @@ interface LogEvent {
           <h2>Historial & Logs de Ejecución</h2>
           <p class="subtitle">Eventos en tiempo real de envíos, entregas, errores y pausas anti-baneo</p>
         </div>
-        <button class="btn btn-outline" (click)="downloadLogs()">
+        <button class="btn btn-outline" (click)="downloadLogs()" *ngIf="waService.logs().length > 0">
           <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>Descargar Logs (.txt)</span>
         </button>
@@ -36,7 +30,7 @@ interface LogEvent {
         </div>
         <div class="stream-tag-box">
           <span class="pulse-dot"></span>
-          <span class="live-stream-tag">Streaming en vivo activo</span>
+          <span class="live-stream-tag">Streaming en vivo activo ({{ waService.logs().length }} eventos)</span>
         </div>
       </div>
 
@@ -54,6 +48,10 @@ interface LogEvent {
             {{ log.level | uppercase }}
           </span>
           <span class="log-msg">{{ log.msg }}</span>
+        </div>
+        
+        <div class="empty-logs" *ngIf="filteredLogs().length === 0">
+          <p>No se registraron eventos en este filtro.</p>
         </div>
       </div>
     </div>
@@ -154,30 +152,40 @@ interface LogEvent {
       color: var(--accent-cyan);
       border-color: var(--accent-cyan-glow);
     }
+    .empty-logs {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
   `]
 })
 export class LogsComponent {
   public activeFilter = signal<string>('all');
 
-  public logs = signal<LogEvent[]>([
-    { ts: '14:32:18', level: 'success', actor: 'SENDER', msg: 'Mensaje entregado ➔ Julio Cesar Toical (+51 961061471) · CTA 45812901' },
-    { ts: '14:32:02', level: 'info', actor: 'TYPING', msg: 'Simulando "Escribiendo..." 4.2s para Maria Elena Rosales' },
-    { ts: '14:31:47', level: 'success', actor: 'SENDER', msg: 'Mensaje entregado ➔ Maria Elena Rosales (+51 984512049)' },
-    { ts: '14:31:12', level: 'warn', actor: 'ANTI-BAN', msg: 'Pausa automática activada · 50 mensajes enviados · esperando 10 minutos' },
-    { ts: '14:30:03', level: 'error', actor: 'SENDER', msg: 'Número sin WhatsApp +51 90000000 ➔ Movido automáticamente a Lista Call Center' },
-    { ts: '14:29:44', level: 'success', actor: 'SENDER', msg: 'Mensaje entregado ➔ Ana Lucia Gutierrez (+51 978120394)' },
-    { ts: '14:29:10', level: 'info', actor: 'TEMPLATE', msg: 'Spintax resuelto: "{Hola|Buenos días}" ➔ "Buenos días"' },
-    { ts: '14:28:31', level: 'success', actor: 'SENDER', msg: 'Mensaje entregado con adjunto PDF ➔ Roberto Gonzales' },
-    { ts: '14:28:00', level: 'warn', actor: 'RATE', msg: 'Cadencia elevada detectada ➔ Ajustando delay a 55 segundos' }
-  ]);
+  constructor(public waService: WhatsAppService) {}
 
   public filteredLogs = () => {
     const filter = this.activeFilter();
-    if (filter === 'all') return this.logs();
-    return this.logs().filter(l => l.level === filter);
+    const all = this.waService.logs();
+    if (filter === 'all') return all;
+    return all.filter(l => l.level === filter);
   };
 
   public downloadLogs(): void {
-    alert('Descargando archivo de logs (.txt)');
+    const logs = this.waService.logs();
+    if (logs.length === 0) return;
+
+    const content = logs
+      .map(l => `[${l.ts}] [${l.level.toUpperCase()}] [${l.actor}] ${l.msg}`)
+      .join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Logs_Ejecucion_CRM_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 }

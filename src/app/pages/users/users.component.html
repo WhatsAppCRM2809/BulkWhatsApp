@@ -250,12 +250,28 @@
                   </svg>
                   <span>Editar</span>
                 </button>
-                <button class="btn btn-add-days" (click)="onAddDays(agent.userId, 30)">
-                  +30d
-                </button>
-                <button class="btn btn-add-days-plus" (click)="onAddDays(agent.userId, 90)">
-                  +90d
-                </button>
+                <div class="add-days-input-group">
+                  <input 
+                    type="number" 
+                    class="days-number-input" 
+                    [ngModel]="getCustomDays(agent.userId)" 
+                    (ngModelChange)="customDaysInput[agent.userId] = $event"
+                    min="1" 
+                    max="3650"
+                    placeholder="Días"
+                    title="Cantidad de días a extender"
+                  />
+                  <button 
+                    class="btn btn-add-days-custom" 
+                    (click)="onAddDays(agent.userId, getCustomDays(agent.userId))"
+                    title="Agregar días especificados a la licencia">
+                    <svg class="btn-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span>Agregar</span>
+                  </button>
+                </div>
               </div>
             </td>
           </tr>

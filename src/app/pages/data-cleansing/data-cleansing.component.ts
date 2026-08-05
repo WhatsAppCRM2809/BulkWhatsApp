@@ -215,6 +215,12 @@ export class DataCleansingComponent {
   constructor(public excelService: ExcelService) {}
 
   public exportCleanCsv(): void {
-    alert('Descargando archivo CSV limpio con datos bancarios tratados.');
+    const contacts = this.excelService.allContacts();
+    if (contacts.length === 0) {
+      alert('No hay contactos cargados para exportar. Por favor importa una lista primero.');
+      return;
+    }
+    const timestamp = new Date().toISOString().slice(0, 10);
+    this.excelService.exportContactsToExcel(contacts, `Base_Datos_Limpia_CRM_${timestamp}.xlsx`);
   }
 }

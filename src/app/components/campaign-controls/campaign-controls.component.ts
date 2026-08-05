@@ -36,7 +36,7 @@ import { ExcelService } from '../../core/services/excel.service';
                   [disabled]="waService.campaignStats().status === 'running' || excelService.validContacts().length === 0"
                   (click)="onStartCampaign()">
             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            <span>Iniciar Campaña Masiva</span>
+            <span>{{ getStartButtonLabel() }}</span>
           </button>
 
           <button class="btn btn-secondary" 
@@ -205,13 +205,23 @@ export class CampaignControlsComponent {
     public excelService: ExcelService
   ) {}
 
+  public getStartButtonLabel(): string {
+    const selectedCount = this.excelService.selectedIds().size;
+    const targetCount = this.excelService.getTargetContactsForCampaign().length;
+
+    if (selectedCount > 0) {
+      return `Iniciar Campaña (${targetCount} Seleccionados)`;
+    }
+    return `Iniciar Campaña Masiva (${targetCount} Clientes)`;
+  }
+
   public onStartCampaign(): void {
-    const valid = this.excelService.validContacts();
-    if (valid.length === 0) {
-      alert('¡Debes cargar un archivo Excel o ingresar clientes manualmente antes de iniciar!');
+    const targets = this.excelService.getTargetContactsForCampaign();
+    if (targets.length === 0) {
+      alert('¡Debes cargar un archivo Excel o seleccionar contactos válidos antes de iniciar!');
       return;
     }
-    this.waService.startCampaign(valid);
+    this.waService.startCampaign(targets);
   }
 
   public downloadFinalReport(): void {

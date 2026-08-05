@@ -10,6 +10,8 @@ export interface ContactPhoneItem {
   isValid: boolean;
 }
 
+export type ContactStatus = 'No atendido' | 'Enviado' | 'Atendido' | 'Fallido' | 'Sin Telefono' | 'Pendiente';
+
 export interface FinancialContact {
   id: string;
   ctaBt: string;
@@ -36,7 +38,7 @@ export interface FinancialContact {
   propension?: string | number;
   edad?: number;
   combo?: string;
-  estado: 'Pendiente' | 'Enviado' | 'Fallido' | 'Interesado' | 'Sin Telefono';
+  estado: ContactStatus;
   importedAt: string;
 }
 
@@ -53,10 +55,21 @@ export class ExcelService {
   public validContacts = signal<FinancialContact[]>([]);
   public invalidContacts = signal<FinancialContact[]>([]);
   public selectedContact = signal<FinancialContact | null>(null);
+  public selectedIds = signal<Set<string>>(new Set());
 
   public totalRecords = computed(() => this.allContacts().length);
   public validWhatsAppCount = computed(() => this.validContacts().length);
   public invalidCount = computed(() => this.invalidContacts().length);
+
+  public getTargetContactsForCampaign(): FinancialContact[] {
+    const selected = this.selectedIds();
+    const valid = this.validContacts();
+    if (selected.size > 0) {
+      const filtered = valid.filter(c => selected.has(c.id));
+      if (filtered.length > 0) return filtered;
+    }
+    return valid;
+  }
 
   constructor() {
     this.loadSavedState();
@@ -254,7 +267,7 @@ export class ExcelService {
               propension: row['PROPENSION'] !== undefined && row['PROPENSION'] !== '' ? row['PROPENSION'] : (row['Propension'] || ''),
               edad: Number(row['EDAD'] || row['Edad'] || 0),
               combo: String(row['COMBO'] || row['Combo'] || ''),
-              estado: hasWA ? 'Pendiente' : 'Sin Telefono',
+              estado: hasWA ? 'No atendido' : 'Sin Telefono',
               importedAt: new Date().toLocaleTimeString()
             };
           });
@@ -295,7 +308,7 @@ export class ExcelService {
               propension: rowArr[14] !== undefined && rowArr[14] !== null ? String(rowArr[14]) : '',
               edad: Number(rowArr[15] || 0),
               agencia: String(rowArr[16] || 'Agencia Principal'),
-              estado: hasWA ? 'Pendiente' : 'Sin Telefono',
+              estado: hasWA ? 'No atendido' : 'Sin Telefono',
               importedAt: new Date().toLocaleTimeString()
             };
           });
@@ -337,8 +350,8 @@ export class ExcelService {
       'CTA BT': c.ctaBt,
       'NOMBRE COMPLETO': c.nombreCompleto,
       'TELEFONO VÁLIDO': c.telefonoValido,
+      'ESTADO SEGUIMIENTO': c.estado,
       'PROPENSION': c.propension ?? '',
-      'ESTADO ENVÍO': c.estado,
       'PRODUCTO': c.producto,
       'OFERTA (S/)': c.oferta,
       'TASA (%)': c.tasa,
@@ -354,6 +367,82 @@ export class ExcelService {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Contactos');
     XLSX.writeFile(workbook, fileName);
+  }
+
+  /**
+   * Updates status of a specific contact (No atendido, Enviado, Atendido, etc.)
+   */
+  public updateContactStatus(contactId: string, status: ContactStatus): void {
+    const updated = this.allContacts().map(c => {
+      if (c.id === contactId) {
+        return { ...c, estado: status };
+      }
+      return c;
+    });
+    this.updateState(updated);
+  }
+
+  /**
+   * Updates primary phone number of a contact
+   */
+  public updateContactPhone(contactId: string, newPhone: string): void {
+    const clean = String(newPhone).replace(/\D/g, '');
+    const validPhone = clean.length === 9 ? `51${clean}` : clean;
+    const hasWA = validPhone.length >= 9;
+
+    const updated = this.allContacts().map(c => {
+      if (c.id === contactId) {
+        return {
+          ...c,
+          telefonoValido: validPhone,
+          hasWhatsApp: hasWA,
+          estado: (hasWA ? (c.estado === 'Sin Telefono' ? 'No atendido' : c.estado) : 'Sin Telefono') as ContactStatus
+        };
+      }
+      return c;
+    });
+    this.updateState(updated);
+  }
+
+  /**
+   * Updates specific fields of a contact
+   */
+  public updateContactField(contactId: string, updates: Partial<FinancialContact>): void {
+    const updated = this.allContacts().map(c => {
+      if (c.id === contactId) {
+        let updatedContact = { ...c, ...updates };
+        if (updates.nombreCompleto) {
+          const nameParsed = this.cleanAndSplitName(updates.nombreCompleto);
+          updatedContact = {
+            ...updatedContact,
+            nombreCompleto: nameParsed.fullTitleCase,
+            primerNombre: nameParsed.primerNombre,
+            nombres: nameParsed.nombres,
+            apellidoPaterno: nameParsed.apellidoPaterno
+          };
+        }
+        return updatedContact;
+      }
+      return c;
+    });
+    this.updateState(updated);
+  }
+
+  /**
+   * Deletes a single contact by ID
+   */
+  public deleteContact(contactId: string): void {
+    const updated = this.allContacts().filter(c => c.id !== contactId);
+    this.updateState(updated);
+  }
+
+  /**
+   * Deletes a list of contacts by IDs (batch delete)
+   */
+  public deleteContactsBatch(contactIds: string[]): void {
+    const idSet = new Set(contactIds);
+    const updated = this.allContacts().filter(c => !idSet.has(c.id));
+    this.updateState(updated);
   }
 
   /**
