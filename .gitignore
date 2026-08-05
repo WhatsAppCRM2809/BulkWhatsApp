@@ -39,6 +39,10 @@ testem.log
 /typings
 __screenshots__/
 
+# Generated Executables & Desktop Bundles
+BulkWhatsAppCRM-*
+*.exe
+
 # System files
 .DS_Store
 Thumbs.db
