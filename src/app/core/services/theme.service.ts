@@ -13,13 +13,7 @@ export class ThemeService {
   }
 
   private initTheme(): void {
-    const savedTheme = localStorage.getItem('bulk_whatsapp_theme') as ThemeMode | null;
-    if (savedTheme) {
-      this.setTheme(savedTheme);
-    } else {
-      // Default to Dark Mode for sleek enterprise feel
-      this.setTheme('dark');
-    }
+    this.setTheme('dark');
   }
 
   public toggleTheme(): void {
