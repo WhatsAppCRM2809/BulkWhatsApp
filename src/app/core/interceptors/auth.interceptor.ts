@@ -43,9 +43,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           confirmText: 'Entendido'
         });
       } else if (error.status >= 500) {
+        const customMessage = typeof error.error === 'string' ? error.error : (error.error?.message || error.message || 'Ocurrió un problema interno en el servidor.');
         modalService.show({
           title: '⚠️ Error del Servidor',
-          message: error.error?.message || 'Ocurrió un problema interno en el servidor.',
+          message: customMessage,
           type: 'error',
           confirmText: 'Cerrar'
         });
