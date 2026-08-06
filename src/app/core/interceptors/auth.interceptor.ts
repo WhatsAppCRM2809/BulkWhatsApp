@@ -9,10 +9,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const modalService = inject(ModalService);
 
-  const token = localStorage.getItem('token');
-  let authReq = req;
+  const isPublicEndpoint = req.url.includes('/auth/login') || req.url.includes('/auth/register') || req.url.includes('/health');
 
-  if (token && token !== 'null' && token !== 'undefined') {
+  if (!isPublicEndpoint && token && token !== 'null' && token !== 'undefined') {
     authReq = req.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`
