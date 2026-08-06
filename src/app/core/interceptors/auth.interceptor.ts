@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { ModalService } from '../services/modal.service';
+import { environment } from '../../../environments/environment';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
@@ -37,8 +38,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         });
       } else if (error.status === 0) {
         modalService.show({
-          title: '🔌 Sin Conexión al Servidor',
-          message: 'No se pudo establecer comunicación con el backend (http://localhost:8080). Asegúrate de iniciar el servidor Java.',
+          title: '🔌 Servidor Desconectado o Iniciando',
+          message: `No se pudo establecer comunicación con el servidor backend (${environment.apiUrl}). Si el servidor en Render estaba inactivo, está despertando y estará listo en 30 segundos.`,
           type: 'error',
           confirmText: 'Entendido'
         });
