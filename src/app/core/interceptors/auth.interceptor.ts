@@ -41,7 +41,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       } else if (error.status === 0) {
         modalService.show({
           title: '🔌 Servidor Desconectado o Iniciando',
-          message: `No se pudo establecer comunicación con el servidor backend (${environment.apiUrl}). Si el servidor en Render estaba inactivo, está despertando y estará listo en 30 segundos.`,
+          message: `No se pudo establecer comunicación con el servidor backend local (${environment.apiUrl}). Verifica que Docker esté ejecutándose o espera unos segundos a que termine de iniciar.`,
           type: 'error',
           confirmText: 'Entendido'
         });

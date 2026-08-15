@@ -70,19 +70,36 @@ export class WhatsAppService {
     private authService: AuthService,
     private excelService: ExcelService
   ) {
-    // Re-fetch template from PostgreSQL database whenever logged in user changes
     this.authService.currentUser$.subscribe(user => {
       if (user) {
         this.fetchUserTemplateFromPostgres();
+        this.checkInitialConnectionStatus();
       } else {
         this.messageTemplate.set(DEFAULT_BANK_TEMPLATE);
+        this.isConnected.set(false);
+        this.connectedNumber.set('Sin Vincular');
       }
     });
   }
 
-  /**
-   * Fetches user's saved message template directly from PostgreSQL database
-   */
+  public checkInitialConnectionStatus(): void {
+    this.getStatus().subscribe({
+      next: (info) => {
+        const isConn = info && info.status === 'CONNECTED';
+        this.isConnected.set(isConn);
+        if (isConn) {
+          this.connectedNumber.set(info.ownerJid || info.instanceName || 'WhatsApp Activo');
+        } else {
+          this.connectedNumber.set('Sin Vincular');
+        }
+      },
+      error: () => {
+        this.isConnected.set(false);
+        this.connectedNumber.set('Sin Vincular');
+      }
+    });
+  }
+
   public fetchUserTemplateFromPostgres(): void {
     this.http.get<{ template: string }>(`${environment.apiUrl}/user/template`).subscribe({
       next: (res) => {
@@ -93,28 +110,21 @@ export class WhatsAppService {
         }
       },
       error: (err) => {
-        console.warn('Could not fetch template from PostgreSQL:', err);
+        console.warn('Could not fetch template:', err);
         this.messageTemplate.set(DEFAULT_BANK_TEMPLATE);
       }
     });
   }
 
-  /**
-   * Updates only local draft in UI (without hitting database)
-   */
   public setLocalTemplate(text: string): void {
     this.messageTemplate.set(text);
   }
 
-  /**
-   * Explicitly saves current template in PostgreSQL database
-   */
   public saveTemplateInDatabase(text: string): Observable<any> {
     this.messageTemplate.set(text);
     return this.http.put(`${environment.apiUrl}/user/template`, { template: text });
   }
 
-  // Evolution API v2 Backend Services
   createInstance(): Observable<WhatsAppInstanceResponse> {
     return this.http.post<WhatsAppInstanceResponse>(`${this.apiUrl}/instance/create`, {});
   }
@@ -135,7 +145,6 @@ export class WhatsAppService {
     return this.http.post<{ success: boolean }>(`${this.apiUrl}/send-text`, { number, text });
   }
 
-  // Campaign State & Risk Management
   public setRiskLevel(level: RiskLevel): void {
     this.riskLevel.set(level);
   }
@@ -143,11 +152,11 @@ export class WhatsAppService {
   public getDelaySeconds(): number {
     switch (this.riskLevel()) {
       case 'low':
-        return 8; // 8 seconds delay (Anti-ban safe)
+        return 8;
       case 'medium':
-        return 4; // 4 seconds delay
+        return 4;
       case 'high':
-        return 2; // 2 seconds delay
+        return 2;
     }
   }
 
@@ -184,7 +193,6 @@ export class WhatsAppService {
     text = text.replace(/\{EDAD\}|\{edad\}/g, contact.edad ? String(contact.edad) : '');
     text = text.replace(/\{COMBO\}|\{combo\}/g, contact.combo || '');
 
-    // Dynamic replacement for any custom attributes from Excel
     if (contact.customAttributes) {
       Object.keys(contact.customAttributes).forEach(key => {
         const val = contact.customAttributes![key];
@@ -196,7 +204,6 @@ export class WhatsAppService {
       });
     }
 
-    // Spintax resolution {Hola|Buenos días|Estimado/a}
     text = text.replace(/\{([^{}]+)\}/g, (match, choicesStr) => {
       if (choicesStr.includes('|')) {
         const choices = choicesStr.split('|');
@@ -211,6 +218,10 @@ export class WhatsAppService {
 
   public async startCampaign(contacts: FinancialContact[]): Promise<void> {
     if (contacts.length === 0) return;
+    if (!this.isConnected()) {
+      alert('⚠️ WhatsApp no está vinculado. Por favor, conecta tu cuenta antes de iniciar la campaña.');
+      return;
+    }
 
     const templateText = this.messageTemplate();
     const delaySecs = this.getDelaySeconds();
@@ -258,7 +269,6 @@ export class WhatsAppService {
       const progress = Math.round(((i + 1) / contacts.length) * 100);
       this.campaignStats.update(s => ({ ...s, progressPercent: progress }));
 
-      // Wait anti-ban delay before next message
       if (i < contacts.length - 1 && this.campaignStats().status === 'running') {
         this.addLog('info', 'ANTI-BAN', `Espera inteligente de ${delaySecs}s antes del siguiente cliente...`);
         await new Promise(resolve => setTimeout(resolve, delaySecs * 1000));

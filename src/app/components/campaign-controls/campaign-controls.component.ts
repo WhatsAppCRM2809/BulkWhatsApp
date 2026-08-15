@@ -33,7 +33,7 @@ import { ExcelService } from '../../core/services/excel.service';
         <!-- Action Control Buttons -->
         <div class="action-buttons-zone">
           <button class="btn btn-primary btn-lg" 
-                  [disabled]="waService.campaignStats().status === 'running' || excelService.validContacts().length === 0"
+                  [disabled]="!waService.isConnected() || waService.campaignStats().status === 'running' || excelService.validContacts().length === 0"
                   (click)="onStartCampaign()">
             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             <span>{{ getStartButtonLabel() }}</span>
@@ -153,6 +153,10 @@ import { ExcelService } from '../../core/services/excel.service';
       padding: 0.8rem 1.75rem;
       font-size: 1rem;
     }
+    .btn-lg:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
     .btn-svg {
       width: 16px;
       height: 16px;
@@ -206,6 +210,9 @@ export class CampaignControlsComponent {
   ) {}
 
   public getStartButtonLabel(): string {
+    if (!this.waService.isConnected()) {
+      return '⚠️ Vincular WhatsApp para Iniciar Envío';
+    }
     const selectedCount = this.excelService.selectedIds().size;
     const targetCount = this.excelService.getTargetContactsForCampaign().length;
 
@@ -216,6 +223,10 @@ export class CampaignControlsComponent {
   }
 
   public onStartCampaign(): void {
+    if (!this.waService.isConnected()) {
+      alert('⚠️ WhatsApp no está vinculado. Por favor, ve a la sección WhatsApp Connect y escanea el código QR antes de iniciar la campaña.');
+      return;
+    }
     const targets = this.excelService.getTargetContactsForCampaign();
     if (targets.length === 0) {
       alert('¡Debes cargar un archivo Excel o seleccionar contactos válidos antes de iniciar!');
